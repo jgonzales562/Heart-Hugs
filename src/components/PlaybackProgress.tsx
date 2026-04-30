@@ -4,29 +4,70 @@ import { colors, theme } from '../theme';
 import { formatPlaybackTime } from '../utils/time';
 
 type PlaybackProgressProps = {
-  currentTime: number;
-  duration: number;
-  progress: number;
+  accessibilityLabel?: string;
+  currentTime?: number;
+  duration?: number;
+  progress?: number;
   tone?: 'soft' | 'overlay';
 };
 
+export function sanitizePlaybackTime(value?: number) {
+  return Number.isFinite(value) ? Math.max(0, value ?? 0) : 0;
+}
+
+export function clampPlaybackProgress(value?: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(value ?? 0, 1));
+}
+
+export function getPlaybackProgress(currentTime?: number, duration?: number) {
+  const safeDuration = sanitizePlaybackTime(duration);
+
+  if (safeDuration <= 0) {
+    return 0;
+  }
+
+  return clampPlaybackProgress(sanitizePlaybackTime(currentTime) / safeDuration);
+}
+
 export function PlaybackProgress({
+  accessibilityLabel,
   currentTime,
   duration,
   progress,
   tone = 'soft',
 }: PlaybackProgressProps) {
-  const clampedProgress = Math.max(0, Math.min(progress, 1));
+  const safeCurrentTime = sanitizePlaybackTime(currentTime);
+  const safeDuration = sanitizePlaybackTime(duration);
+  const clampedProgress = clampPlaybackProgress(progress);
+  const accessibilityMax = safeDuration || 1;
+  const accessibilityNow = safeDuration ? Math.min(safeCurrentTime, safeDuration) : 0;
   const isOverlay = tone === 'overlay';
 
   return (
-    <View style={styles.container}>
+    <View
+      accessibilityLabel={
+        accessibilityLabel ??
+        `Playback progress ${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`
+      }
+      accessibilityRole="progressbar"
+      accessibilityValue={{
+        max: accessibilityMax,
+        min: 0,
+        now: accessibilityNow,
+        text: `${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`,
+      }}
+      style={styles.container}
+    >
       <View style={styles.timeRow}>
         <Text style={[styles.timeText, isOverlay && styles.overlayTimeText]}>
-          {formatPlaybackTime(currentTime)}
+          {formatPlaybackTime(safeCurrentTime)}
         </Text>
         <Text style={[styles.timeText, isOverlay && styles.overlayTimeText]}>
-          {formatPlaybackTime(duration)}
+          {formatPlaybackTime(safeDuration)}
         </Text>
       </View>
       <View style={[styles.track, isOverlay && styles.overlayTrack]}>

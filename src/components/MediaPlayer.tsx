@@ -1,11 +1,16 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useEventListener } from 'expo';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { PlaybackProgress } from './PlaybackProgress';
+import {
+  PlaybackProgress,
+  getPlaybackProgress,
+  sanitizePlaybackTime,
+} from './PlaybackProgress';
 import { PlaybackToggle } from './PlaybackToggle';
 import { colors, gradients, theme } from '../theme';
 import { Session } from '../types/session';
@@ -29,15 +34,23 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
   useEffect(() => {
     player.loop = false;
     player.volume = 0.86;
+
+    return () => {
+      player.pause();
+    };
   }, [player]);
 
-  const progress = useMemo(() => {
-    if (!status.duration) {
-      return 0;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        player.pause();
+      };
+    }, [player])
+  );
 
-    return Math.min(status.currentTime / status.duration, 1);
-  }, [status.currentTime, status.duration]);
+  const currentTime = sanitizePlaybackTime(status.currentTime);
+  const duration = sanitizePlaybackTime(status.duration);
+  const progress = getPlaybackProgress(currentTime, duration);
 
   function togglePlayback() {
     if (status.playing) {
@@ -55,7 +68,9 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
         <View style={styles.audioFocus}>
           <View style={styles.audioRing}>
             <PlaybackToggle
-              accessibilityLabel={status.playing ? 'Pause audio session' : 'Play audio session'}
+              accessibilityLabel={
+                status.playing ? `Pause ${session.title}` : `Play ${session.title}`
+              }
               isPlaying={status.playing}
               onPress={togglePlayback}
               variant="large"
@@ -64,8 +79,9 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
         </View>
 
         <PlaybackProgress
-          currentTime={status.currentTime}
-          duration={status.duration}
+          accessibilityLabel={`${session.title} progress`}
+          currentTime={currentTime}
+          duration={duration}
           progress={progress}
         />
       </LinearGradient>
@@ -96,17 +112,43 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     videoPlayer.volume = 0.86;
   });
 
+  useEffect(() => {
+    return () => {
+      player.pause();
+    };
+  }, [player]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        player.pause();
+        setIsPlaying(false);
+      };
+    }, [player])
+  );
+
   useEventListener(player, 'playingChange', ({ isPlaying: nextIsPlaying }) => {
     setIsPlaying(nextIsPlaying);
   });
 
   useEventListener(player, 'timeUpdate', ({ currentTime: nextCurrentTime }) => {
-    setCurrentTime(nextCurrentTime);
-    setDuration(player.duration);
+    const safeCurrentTime = sanitizePlaybackTime(nextCurrentTime);
+
+    setCurrentTime((previousTime) => {
+      const isNearPreviousTime = Math.abs(safeCurrentTime - previousTime) < 0.15;
+
+      if (isNearPreviousTime && safeCurrentTime !== 0) {
+        return previousTime;
+      }
+
+      return safeCurrentTime;
+    });
+
+    setDuration(sanitizePlaybackTime(player.duration));
   });
 
   useEventListener(player, 'statusChange', () => {
-    setDuration(player.duration);
+    setDuration(sanitizePlaybackTime(player.duration));
   });
 
   function togglePlayback() {
@@ -117,7 +159,7 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     }
   }
 
-  const progress = duration ? Math.min(currentTime / duration, 1) : 0;
+  const progress = getPlaybackProgress(currentTime, duration);
 
   return (
     <View style={styles.surface}>
@@ -135,12 +177,15 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
         >
           <View style={styles.videoControls}>
             <PlaybackToggle
-              accessibilityLabel={isPlaying ? 'Pause video session' : 'Play video session'}
+              accessibilityLabel={
+                isPlaying ? `Pause ${session.title} video` : `Play ${session.title} video`
+              }
               isPlaying={isPlaying}
               onPress={togglePlayback}
             />
             <View style={styles.videoProgress}>
               <PlaybackProgress
+                accessibilityLabel={`${session.title} video progress`}
                 currentTime={currentTime}
                 duration={duration}
                 progress={progress}

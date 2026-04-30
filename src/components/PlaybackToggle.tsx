@@ -1,4 +1,5 @@
 import { Pause, Play } from 'lucide-react-native';
+import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { colors, theme } from '../theme';
@@ -18,12 +19,38 @@ export function PlaybackToggle({
 }: PlaybackToggleProps) {
   const isLarge = variant === 'large';
   const iconSize = isLarge ? 38 : 20;
+  const pressGuardTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPressGuardActive = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (pressGuardTimeout.current) {
+        clearTimeout(pressGuardTimeout.current);
+      }
+    };
+  }, []);
+
+  function handlePress() {
+    if (isPressGuardActive.current) {
+      return;
+    }
+
+    isPressGuardActive.current = true;
+    onPress();
+
+    pressGuardTimeout.current = setTimeout(() => {
+      isPressGuardActive.current = false;
+    }, 350);
+  }
 
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint="Toggles playback for this session."
       accessibilityRole="button"
-      onPress={onPress}
+      accessibilityState={{ selected: isPlaying }}
+      hitSlop={isLarge ? 0 : theme.spacing.xs}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.button,
         isLarge ? styles.largeButton : styles.compactButton,
