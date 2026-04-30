@@ -1,13 +1,24 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-export type RootTabParamList = {
+export type RootStackParamList = {
+  MainTabs: undefined;
+  Player: { sessionId?: string } | undefined;
+};
+
+export type MainTabParamList = {
   Home: undefined;
   Library: undefined;
-  Player: { sessionId?: string } | undefined;
   About: undefined;
 };
 
-export type TabScreenProps<T extends keyof RootTabParamList> = BottomTabScreenProps<
-  RootTabParamList,
+export type MainTabScreenProps<T extends keyof MainTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, T>,
+  NativeStackScreenProps<RootStackParamList>
+>;
+
+export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
+  RootStackParamList,
   T
 >;

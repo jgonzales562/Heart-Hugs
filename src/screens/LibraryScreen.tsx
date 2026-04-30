@@ -6,10 +6,10 @@ import { GradientScreen } from '../components/GradientScreen';
 import { SessionCard } from '../components/SessionCard';
 import { categories, sessions } from '../data/sessions';
 import { colors, theme } from '../theme';
-import { TabScreenProps } from '../types/navigation';
+import { MainTabScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
 
-export function LibraryScreen({ navigation }: TabScreenProps<'Library'>) {
+export function LibraryScreen({ navigation }: MainTabScreenProps<'Library'>) {
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   const filteredSessions = useMemo(() => {

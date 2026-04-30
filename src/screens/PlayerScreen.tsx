@@ -5,10 +5,10 @@ import { MediaPlayer } from '../components/MediaPlayer';
 import { SessionCard } from '../components/SessionCard';
 import { getDefaultSession, getSessionById, sessions } from '../data/sessions';
 import { colors, theme } from '../theme';
-import { TabScreenProps } from '../types/navigation';
+import { RootStackScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
 
-export function PlayerScreen({ navigation, route }: TabScreenProps<'Player'>) {
+export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player'>) {
   const activeSession = getSessionById(route.params?.sessionId) ?? getDefaultSession();
   const relatedSessions = sessions
     .filter((session) => session.id !== activeSession.id && session.category === activeSession.category)

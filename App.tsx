@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { BookOpen, CirclePlay, Heart, Home, Info } from 'lucide-react-native';
+import { BookOpen, Heart, Home, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,11 +17,12 @@ import { LibraryScreen } from './src/screens/LibraryScreen';
 import { PlayerScreen } from './src/screens/PlayerScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { colors, theme } from './src/theme';
-import { RootTabParamList } from './src/types/navigation';
+import { MainTabParamList, RootStackParamList } from './src/types/navigation';
 
 enableScreens();
 
-const Tab = createBottomTabNavigator<RootTabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const navigationTheme = {
   ...NavigationDefaultTheme,
@@ -65,15 +67,6 @@ function AppTabs() {
         }}
       />
       <Tab.Screen
-        name="Player"
-        component={PlayerScreen}
-        options={{
-          tabBarIcon: ({ color, focused }) => (
-            <CirclePlay color={color} size={24} strokeWidth={focused ? 2.6 : 2} />
-          ),
-        }}
-      />
-      <Tab.Screen
         name="About"
         component={AboutScreen}
         options={{
@@ -83,6 +76,15 @@ function AppTabs() {
         }}
       />
     </Tab.Navigator>
+  );
+}
+
+function RootNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={AppTabs} />
+      <Stack.Screen name="Player" component={PlayerScreen} />
+    </Stack.Navigator>
   );
 }
 
@@ -128,7 +130,7 @@ export default function App() {
         </GradientScreen>
       ) : hasAcceptedDisclaimer ? (
         <NavigationContainer theme={navigationTheme}>
-          <AppTabs />
+          <RootNavigator />
         </NavigationContainer>
       ) : (
         <WelcomeScreen onAccept={acceptDisclaimer} />

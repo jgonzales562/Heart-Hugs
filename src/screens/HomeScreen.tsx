@@ -6,10 +6,10 @@ import { SessionCard } from '../components/SessionCard';
 import { WELLNESS_DISCLAIMER } from '../constants/disclaimer';
 import { sessions } from '../data/sessions';
 import { colors, theme } from '../theme';
-import { TabScreenProps } from '../types/navigation';
+import { MainTabScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
 
-export function HomeScreen({ navigation }: TabScreenProps<'Home'>) {
+export function HomeScreen({ navigation }: MainTabScreenProps<'Home'>) {
   const featuredSessions = sessions.filter((session) => session.isFeatured);
   const firstFeaturedSession = featuredSessions[0] ?? sessions[0];
   const nextSessions = sessions.filter((session) => session.id !== firstFeaturedSession.id).slice(0, 3);
