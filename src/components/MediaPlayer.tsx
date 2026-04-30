@@ -132,18 +132,7 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
   });
 
   useEventListener(player, 'timeUpdate', ({ currentTime: nextCurrentTime }) => {
-    const safeCurrentTime = sanitizePlaybackTime(nextCurrentTime);
-
-    setCurrentTime((previousTime) => {
-      const isNearPreviousTime = Math.abs(safeCurrentTime - previousTime) < 0.15;
-
-      if (isNearPreviousTime && safeCurrentTime !== 0) {
-        return previousTime;
-      }
-
-      return safeCurrentTime;
-    });
-
+    setCurrentTime(sanitizePlaybackTime(nextCurrentTime));
     setDuration(sanitizePlaybackTime(player.duration));
   });
 
