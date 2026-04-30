@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type RootStackParamList = {
   MainTabs: undefined;
-  Player: { sessionId?: string } | undefined;
+  Player: { sessionId: string };
 };
 
 export type MainTabParamList = {

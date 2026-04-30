@@ -9,7 +9,7 @@ import { RootStackScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
 
 export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player'>) {
-  const activeSession = getSessionById(route.params?.sessionId) ?? getDefaultSession();
+  const activeSession = getSessionById(route.params.sessionId) ?? getDefaultSession();
   const relatedSessions = sessions
     .filter((session) => session.id !== activeSession.id && session.category === activeSession.category)
     .concat(sessions.filter((session) => session.id !== activeSession.id))
