@@ -24,13 +24,15 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
   }
 
   return (
-    <GradientScreen scroll>
-      <View style={styles.header}>
-        <Text style={styles.title}>Player</Text>
-        <Text style={styles.subtitle}>{activeSession.category}</Text>
-      </View>
+    <GradientScreen contentContainerStyle={styles.content} scroll>
+      <View style={styles.playerArea}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Player</Text>
+          <Text style={styles.subtitle}>{activeSession.category}</Text>
+        </View>
 
-      <MediaPlayer key={activeSession.id} session={activeSession} />
+        <MediaPlayer key={activeSession.id} session={activeSession} />
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>More for this moment</Text>
@@ -45,9 +47,17 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
 }
 
 const styles = StyleSheet.create({
+  content: {
+    justifyContent: 'center',
+    paddingBottom: theme.spacing.xl,
+  },
+  playerArea: {
+    flexGrow: 1,
+    gap: theme.spacing.lg,
+    justifyContent: 'center',
+  },
   header: {
     gap: theme.spacing.xs,
-    paddingBottom: theme.spacing.lg,
   },
   title: {
     color: colors.navy,
@@ -63,7 +73,6 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: theme.spacing.md,
-    paddingBottom: theme.spacing.xl,
     paddingTop: theme.spacing.xl,
   },
   sectionTitle: {
