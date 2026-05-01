@@ -52,9 +52,7 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
   },
   playerArea: {
-    flexGrow: 1,
     gap: theme.spacing.lg,
-    justifyContent: 'center',
   },
   header: {
     gap: theme.spacing.xs,
