@@ -48,7 +48,6 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
 
 const styles = StyleSheet.create({
   content: {
-    justifyContent: 'center',
     paddingBottom: theme.spacing.xl,
   },
   playerArea: {
