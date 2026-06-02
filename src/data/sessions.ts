@@ -41,7 +41,7 @@ export const sessions: Session[] = [
     tags: ['paced breathing', 'visual cue', 'focus'],
     benefits: ['slow racing thoughts', 'support calmer breathing'],
     mediaType: 'video',
-    mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    mediaUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
     thumbnailUrl:
       'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80',
     isFeatured: true,
@@ -71,7 +71,7 @@ export const sessions: Session[] = [
     tags: ['guided imagery', 'bedtime', 'unwinding'],
     benefits: ['prepare for rest', 'release the day'],
     mediaType: 'video',
-    mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    mediaUrl: 'https://media.w3.org/2010/05/video/movie_300.mp4',
     thumbnailUrl:
       'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=80',
     isFeatured: false,

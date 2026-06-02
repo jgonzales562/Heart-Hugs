@@ -1,10 +1,10 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useIsFocused } from '@react-navigation/native';
 import { useEventListener } from 'expo';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, StyleSheet, Text, View } from 'react-native';
 
 import {
   PlaybackProgress,
@@ -22,7 +22,37 @@ type MediaPlayerProps = {
 type PausePlayback = () => void;
 
 const playbackPausers = new Map<string, PausePlayback>();
+let backgroundAudioPlaybackId: string | null = null;
 let playbackInstanceCount = 0;
+
+async function enableBackgroundAudioPlayback(playbackId: string) {
+  backgroundAudioPlaybackId = playbackId;
+
+  try {
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+    });
+  } catch (error) {
+    console.warn('Unable to enable background audio playback.', error);
+  }
+}
+
+async function disableBackgroundAudioPlayback(playbackId?: string) {
+  if (playbackId && backgroundAudioPlaybackId !== playbackId) {
+    return;
+  }
+
+  backgroundAudioPlaybackId = null;
+
+  try {
+    await setAudioModeAsync({
+      shouldPlayInBackground: false,
+    });
+  } catch (error) {
+    console.warn('Unable to disable background audio playback.', error);
+  }
+}
 
 function usePlaybackInstanceId(): string {
   const playbackInstanceId = useRef<string | null>(null);
@@ -71,6 +101,7 @@ export function MediaPlayer({ session }: MediaPlayerProps) {
 }
 
 function AudioSessionPlayer({ session }: MediaPlayerProps) {
+  const isFocused = useIsFocused();
   const playbackInstanceId = usePlaybackInstanceId();
   const player = useAudioPlayer(session.mediaUrl, { updateInterval: 500 });
   const status = useAudioPlayerStatus(player);
@@ -78,19 +109,20 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
   useEffect(() => {
     player.loop = false;
     player.volume = 0.86;
-
-    return () => {
-      player.pause();
-    };
   }, [player]);
 
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        player.pause();
-      };
-    }, [player])
-  );
+  useEffect(() => {
+    if (!isFocused) {
+      player.pause();
+      void disableBackgroundAudioPlayback(playbackInstanceId);
+    }
+  }, [isFocused, playbackInstanceId, player]);
+
+  useEffect(() => {
+    return () => {
+      void disableBackgroundAudioPlayback(playbackInstanceId);
+    };
+  }, [playbackInstanceId]);
 
   useRegisteredPlaybackPauser(playbackInstanceId, () => {
     player.pause();
@@ -100,10 +132,12 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
   const duration = sanitizePlaybackTime(status.duration);
   const progress = getPlaybackProgress(currentTime, duration);
 
-  function togglePlayback() {
+  async function togglePlayback() {
     if (status.playing) {
       player.pause();
+      void disableBackgroundAudioPlayback(playbackInstanceId);
     } else {
+      await enableBackgroundAudioPlayback(playbackInstanceId);
       pauseOtherPlayers(playbackInstanceId);
       player.play();
     }
@@ -139,6 +173,7 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
 }
 
 function VideoSessionPlayer({ session }: MediaPlayerProps) {
+  const isFocused = useIsFocused();
   const playbackInstanceId = usePlaybackInstanceId();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -163,19 +198,26 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
   });
 
   useEffect(() => {
-    return () => {
+    if (!isFocused) {
       player.pause();
-    };
-  }, [player]);
+      setIsPlaying(false);
+      void disableBackgroundAudioPlayback();
+    }
+  }, [isFocused, player]);
 
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState !== 'active') {
         player.pause();
         setIsPlaying(false);
-      };
-    }, [player])
-  );
+        void disableBackgroundAudioPlayback();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [player]);
 
   useRegisteredPlaybackPauser(playbackInstanceId, () => {
     player.pause();
@@ -195,10 +237,11 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     setDuration(sanitizePlaybackTime(player.duration));
   });
 
-  function togglePlayback() {
+  async function togglePlayback() {
     if (isPlaying) {
       player.pause();
     } else {
+      await disableBackgroundAudioPlayback();
       pauseOtherPlayers(playbackInstanceId);
       player.play();
     }
@@ -215,6 +258,7 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
           nativeControls={false}
           player={player}
           style={styles.video}
+          surfaceType="textureView"
         />
         <LinearGradient
           colors={['rgba(23, 42, 68, 0)', 'rgba(23, 42, 68, 0.72)']}

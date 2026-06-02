@@ -13,6 +13,11 @@
       "backgroundColor": "#FFF9F0"
     },
     "ios": {
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      },
       "supportsTablet": true
     },
     "android": {

@@ -97,10 +97,10 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
   },
   compactCard: {
-    minHeight: 190,
+    height: 240,
   },
   largeCard: {
-    minHeight: 280,
+    height: 280,
   },
   pressed: {
     opacity: 0.88,
@@ -108,7 +108,6 @@ const styles = StyleSheet.create({
   },
   imageBackground: {
     flex: 1,
-    minHeight: '100%',
   },
   image: {
     borderRadius: theme.radius.lg,
