@@ -14,10 +14,13 @@ type SessionCardProps = {
 export function SessionCard({ onPress, session, variant = 'compact' }: SessionCardProps) {
   const MediaIcon = session.mediaType === 'audio' ? Headphones : Video;
   const isLarge = variant === 'large';
+  const highlights = [session.tags[0], session.benefits[0]]
+    .filter((highlight): highlight is string => Boolean(highlight))
+    .slice(0, 2);
 
   return (
     <Pressable
-      accessibilityLabel={`${session.title}, ${session.mediaType}, ${session.duration}`}
+      accessibilityLabel={`${session.title}, ${session.mediaType}, ${session.durationMinutes} minutes, ${session.difficulty}`}
       accessibilityRole="button"
       onPress={() => onPress(session)}
       style={({ pressed }) => [
@@ -56,11 +59,22 @@ export function SessionCard({ onPress, session, variant = 'compact' }: SessionCa
             <Text numberOfLines={isLarge ? 3 : 2} style={styles.description}>
               {session.description}
             </Text>
+            <View style={styles.highlightRow}>
+              {highlights.map((highlight) => (
+                <View key={highlight} style={styles.highlightPill}>
+                  <Text numberOfLines={1} style={styles.highlightText}>
+                    {highlight}
+                  </Text>
+                </View>
+              ))}
+            </View>
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
                 <Clock color={colors.offWhite} size={14} />
-                <Text style={styles.metaText}>{session.duration}</Text>
+                <Text style={styles.metaText}>{session.durationMinutes} min</Text>
               </View>
+              <Text style={styles.metaDivider}>/</Text>
+              <Text style={styles.metaText}>{session.difficulty}</Text>
               <Text style={styles.metaDivider}>/</Text>
               <Text style={styles.metaText}>{session.category}</Text>
               <ChevronRight color={colors.offWhite} size={18} style={styles.chevron} />
@@ -160,6 +174,7 @@ const styles = StyleSheet.create({
   metaRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing.xs,
     paddingTop: theme.spacing.xs,
   },
@@ -177,6 +192,28 @@ const styles = StyleSheet.create({
   metaDivider: {
     color: colors.lavender,
     fontSize: theme.typography.size.sm,
+  },
+  highlightRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.xs,
+    paddingTop: theme.spacing.xs,
+  },
+  highlightPill: {
+    backgroundColor: 'rgba(255, 249, 240, 0.22)',
+    borderColor: 'rgba(255, 249, 240, 0.32)',
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    maxWidth: '48%',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xxs,
+  },
+  highlightText: {
+    color: colors.offWhite,
+    fontFamily: theme.typography.fontFamily.medium,
+    fontSize: theme.typography.size.xs,
+    lineHeight: theme.typography.lineHeight.sm,
+    textTransform: 'capitalize',
   },
   chevron: {
     marginLeft: 'auto',

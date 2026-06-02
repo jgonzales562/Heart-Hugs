@@ -3,7 +3,7 @@ import { useEventListener } from 'expo';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -19,6 +19,49 @@ type MediaPlayerProps = {
   session: Session;
 };
 
+type PausePlayback = () => void;
+
+const playbackPausers = new Map<string, PausePlayback>();
+let playbackInstanceCount = 0;
+
+function usePlaybackInstanceId(): string {
+  const playbackInstanceId = useRef<string | null>(null);
+
+  if (playbackInstanceId.current === null) {
+    playbackInstanceCount += 1;
+    playbackInstanceId.current = `media-player-${playbackInstanceCount}`;
+  }
+
+  return playbackInstanceId.current;
+}
+
+function pauseOtherPlayers(activePlaybackId: string) {
+  Array.from(playbackPausers.entries()).forEach(([playbackId, pausePlayback]) => {
+    if (playbackId !== activePlaybackId) {
+      pausePlayback();
+    }
+  });
+}
+
+function useRegisteredPlaybackPauser(playbackId: string, pausePlayback: PausePlayback) {
+  const pausePlaybackRef = useRef(pausePlayback);
+  pausePlaybackRef.current = pausePlayback;
+
+  useEffect(() => {
+    const registeredPausePlayback = () => {
+      pausePlaybackRef.current();
+    };
+
+    playbackPausers.set(playbackId, registeredPausePlayback);
+
+    return () => {
+      if (playbackPausers.get(playbackId) === registeredPausePlayback) {
+        playbackPausers.delete(playbackId);
+      }
+    };
+  }, [playbackId]);
+}
+
 export function MediaPlayer({ session }: MediaPlayerProps) {
   if (session.mediaType === 'video') {
     return <VideoSessionPlayer session={session} />;
@@ -28,6 +71,7 @@ export function MediaPlayer({ session }: MediaPlayerProps) {
 }
 
 function AudioSessionPlayer({ session }: MediaPlayerProps) {
+  const playbackInstanceId = usePlaybackInstanceId();
   const player = useAudioPlayer(session.mediaUrl, { updateInterval: 500 });
   const status = useAudioPlayerStatus(player);
 
@@ -48,6 +92,10 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
     }, [player])
   );
 
+  useRegisteredPlaybackPauser(playbackInstanceId, () => {
+    player.pause();
+  });
+
   const currentTime = sanitizePlaybackTime(status.currentTime);
   const duration = sanitizePlaybackTime(status.duration);
   const progress = getPlaybackProgress(currentTime, duration);
@@ -56,6 +104,7 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
     if (status.playing) {
       player.pause();
     } else {
+      pauseOtherPlayers(playbackInstanceId);
       player.play();
     }
   }
@@ -90,6 +139,7 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
 }
 
 function VideoSessionPlayer({ session }: MediaPlayerProps) {
+  const playbackInstanceId = usePlaybackInstanceId();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -127,6 +177,11 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     }, [player])
   );
 
+  useRegisteredPlaybackPauser(playbackInstanceId, () => {
+    player.pause();
+    setIsPlaying(false);
+  });
+
   useEventListener(player, 'playingChange', ({ isPlaying: nextIsPlaying }) => {
     setIsPlaying(nextIsPlaying);
   });
@@ -144,6 +199,7 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     if (isPlaying) {
       player.pause();
     } else {
+      pauseOtherPlayers(playbackInstanceId);
       player.play();
     }
   }
