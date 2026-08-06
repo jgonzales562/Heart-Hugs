@@ -1,18 +1,22 @@
 import { Pause, Play } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 import { colors, theme } from '../theme';
 
 type PlaybackToggleProps = {
   accessibilityLabel: string;
+  disabled?: boolean;
+  isPending?: boolean;
   isPlaying: boolean;
-  onPress: () => void;
+  onPress: () => Promise<void>;
   variant?: 'large' | 'compact';
 };
 
 export function PlaybackToggle({
   accessibilityLabel,
+  disabled = false,
+  isPending = false,
   isPlaying,
   onPress,
   variant = 'compact',
@@ -36,7 +40,9 @@ export function PlaybackToggle({
     }
 
     isPressGuardActive.current = true;
-    onPress();
+    void onPress().catch((error) => {
+      console.warn('Unable to update playback.', error);
+    });
 
     pressGuardTimeout.current = setTimeout(() => {
       isPressGuardActive.current = false;
@@ -48,16 +54,20 @@ export function PlaybackToggle({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint="Toggles playback for this session."
       accessibilityRole="button"
-      accessibilityState={{ selected: isPlaying }}
+      accessibilityState={{ busy: isPending, disabled: disabled || isPending, selected: isPlaying }}
+      disabled={disabled || isPending}
       hitSlop={isLarge ? 0 : theme.spacing.xs}
       onPress={handlePress}
       style={({ pressed }) => [
         styles.button,
         isLarge ? styles.largeButton : styles.compactButton,
+        (disabled || isPending) && styles.disabled,
         pressed && styles.pressed,
       ]}
     >
-      {isPlaying ? (
+      {isPending ? (
+        <ActivityIndicator color={colors.offWhite} size={isLarge ? 'large' : 'small'} />
+      ) : isPlaying ? (
         <Pause color={colors.offWhite} fill={colors.offWhite} size={iconSize} />
       ) : (
         <Play color={colors.offWhite} fill={colors.offWhite} size={iconSize} />
@@ -76,6 +86,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   largeButton: {
+    backgroundColor: colors.tealDeep,
+    elevation: 6,
     height: 104,
     shadowColor: colors.shadow,
     shadowOffset: { height: 12, width: 0 },
@@ -91,5 +103,8 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.86,
     transform: [{ scale: 0.98 }],
+  },
+  disabled: {
+    opacity: 0.56,
   },
 });

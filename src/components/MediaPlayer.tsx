@@ -1,10 +1,11 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useEventListener } from 'expo';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, type AudioPlayer } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, StyleSheet, Text, View } from 'react-native';
+import { VideoView, useVideoPlayer, type VideoPlayerStatus } from 'expo-video';
+import { AlertCircle, RotateCcw } from 'lucide-react-native';
+import { useEffect, useEffectEvent, useId, useMemo, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   PlaybackProgress,
@@ -12,84 +13,39 @@ import {
   sanitizePlaybackTime,
 } from './PlaybackProgress';
 import { PlaybackToggle } from './PlaybackToggle';
+import { playbackCoordinator } from '../services/playback';
 import { colors, gradients, theme } from '../theme';
 import { Session } from '../types/session';
+import { PlaybackKind } from '../utils/PlaybackCoordinator';
 
 type MediaPlayerProps = {
   session: Session;
 };
 
-type PausePlayback = () => void;
-
-const playbackPausers = new Map<string, PausePlayback>();
-let backgroundAudioPlaybackId: string | null = null;
-let playbackInstanceCount = 0;
-
-async function enableBackgroundAudioPlayback(playbackId: string) {
-  backgroundAudioPlaybackId = playbackId;
-
-  try {
-    await setAudioModeAsync({
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-    });
-  } catch (error) {
-    console.warn('Unable to enable background audio playback.', error);
-  }
-}
-
-async function disableBackgroundAudioPlayback(playbackId?: string) {
-  if (playbackId && backgroundAudioPlaybackId !== playbackId) {
-    return;
-  }
-
-  backgroundAudioPlaybackId = null;
-
-  try {
-    await setAudioModeAsync({
-      shouldPlayInBackground: false,
-    });
-  } catch (error) {
-    console.warn('Unable to disable background audio playback.', error);
-  }
-}
+const MEDIA_LOAD_TIMEOUT_MS = 15_000;
 
 function usePlaybackInstanceId(): string {
-  const playbackInstanceId = useRef<string | null>(null);
-
-  if (playbackInstanceId.current === null) {
-    playbackInstanceCount += 1;
-    playbackInstanceId.current = `media-player-${playbackInstanceCount}`;
-  }
-
-  return playbackInstanceId.current;
+  return `media-player-${useId()}`;
 }
 
-function pauseOtherPlayers(activePlaybackId: string) {
-  Array.from(playbackPausers.entries()).forEach(([playbackId, pausePlayback]) => {
-    if (playbackId !== activePlaybackId) {
-      pausePlayback();
-    }
-  });
-}
-
-function useRegisteredPlaybackPauser(playbackId: string, pausePlayback: PausePlayback) {
-  const pausePlaybackRef = useRef(pausePlayback);
-  pausePlaybackRef.current = pausePlayback;
+function useRegisteredPlaybackPauser(
+  playbackId: string,
+  kind: PlaybackKind,
+  pausePlayback: () => void
+) {
+  const onPausePlayback = useEffectEvent(pausePlayback);
 
   useEffect(() => {
-    const registeredPausePlayback = () => {
-      pausePlaybackRef.current();
-    };
+    return playbackCoordinator.register(playbackId, {
+      kind,
+      pause: onPausePlayback,
+    });
+  }, [kind, playbackId]);
+}
 
-    playbackPausers.set(playbackId, registeredPausePlayback);
-
-    return () => {
-      if (playbackPausers.get(playbackId) === registeredPausePlayback) {
-        playbackPausers.delete(playbackId);
-      }
-    };
-  }, [playbackId]);
+function configureAudioPlayer(player: AudioPlayer) {
+  player.loop = false;
+  player.volume = 0.86;
 }
 
 export function MediaPlayer({ session }: MediaPlayerProps) {
@@ -105,28 +61,36 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
   const playbackInstanceId = usePlaybackInstanceId();
   const player = useAudioPlayer(session.mediaUrl, { updateInterval: 500 });
   const status = useAudioPlayerStatus(player);
+  const [isStarting, setIsStarting] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const isLoading = !status.isLoaded || status.isBuffering;
+  const loadError =
+    status.playbackState === 'failed'
+      ? 'This audio could not be loaded.'
+      : null;
+  const errorMessage = playbackError ?? loadError;
 
   useEffect(() => {
-    player.loop = false;
-    player.volume = 0.86;
+    configureAudioPlayer(player);
   }, [player]);
 
   useEffect(() => {
     if (!isFocused) {
-      player.pause();
-      void disableBackgroundAudioPlayback(playbackInstanceId);
+      void playbackCoordinator.stop(playbackInstanceId);
     }
-  }, [isFocused, playbackInstanceId, player]);
+  }, [isFocused, playbackInstanceId]);
+
+  useRegisteredPlaybackPauser(playbackInstanceId, 'audio', () => {
+    player.pause();
+    player.clearLockScreenControls();
+  });
 
   useEffect(() => {
-    return () => {
-      void disableBackgroundAudioPlayback(playbackInstanceId);
-    };
-  }, [playbackInstanceId]);
-
-  useRegisteredPlaybackPauser(playbackInstanceId, () => {
-    player.pause();
-  });
+    if (status.didJustFinish) {
+      void playbackCoordinator.stop(playbackInstanceId);
+    }
+  }, [playbackInstanceId, status.didJustFinish]);
 
   const currentTime = sanitizePlaybackTime(status.currentTime);
   const duration = sanitizePlaybackTime(status.duration);
@@ -134,19 +98,82 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
 
   async function togglePlayback() {
     if (status.playing) {
-      player.pause();
-      void disableBackgroundAudioPlayback(playbackInstanceId);
-    } else {
-      await enableBackgroundAudioPlayback(playbackInstanceId);
-      pauseOtherPlayers(playbackInstanceId);
-      player.play();
+      await playbackCoordinator.stop(playbackInstanceId);
+      return;
+    }
+
+    if (!status.isLoaded || errorMessage) {
+      return;
+    }
+
+    setIsStarting(true);
+    setPlaybackError(null);
+
+    try {
+      if (status.didJustFinish || (duration > 0 && currentTime >= duration)) {
+        await player.seekTo(0);
+      }
+
+      await playbackCoordinator.start(playbackInstanceId, () => {
+        player.setActiveForLockScreen(true, {
+          artist: 'Heart Hugs',
+          artworkUrl: session.thumbnailUrl,
+          title: session.title,
+        }, {
+          showSeekBackward: true,
+          showSeekForward: true,
+        });
+        player.play();
+      });
+    } catch (error) {
+      console.warn(`Unable to play ${session.title}.`, error);
+      setPlaybackError('Playback could not start. Please try again.');
+    } finally {
+      setIsStarting(false);
+    }
+  }
+
+  async function seekAudio(time: number) {
+    if (!status.isLoaded) {
+      return;
+    }
+
+    try {
+      await player.seekTo(time);
+    } catch (error) {
+      console.warn(`Unable to seek ${session.title}.`, error);
+      setPlaybackError('Playback could not seek to that position. Please try again.');
+    }
+  }
+
+  function retryAudio() {
+    void playbackCoordinator.stop(playbackInstanceId);
+    setPlaybackError(null);
+    setRetryAttempt((attempt) => attempt + 1);
+
+    try {
+      player.replace(session.mediaUrl);
+    } catch (error) {
+      console.warn(`Unable to reload ${session.title}.`, error);
+      setPlaybackError('This audio could not be reloaded. Please try again.');
     }
   }
 
   return (
     <View style={styles.surface}>
-      <LinearGradient colors={gradients.card} style={styles.audioGradient}>
-        <SessionCopy session={session} />
+      <LinearGradient colors={gradients.player} style={styles.audioGradient}>
+        <SessionCopy session={session} tone="overlay" />
+
+        {errorMessage || isLoading ? (
+          <PlaybackStatusMessage
+            errorMessage={errorMessage}
+            isLoading={isLoading && !errorMessage}
+            key={`audio-${retryAttempt}-${errorMessage ? 'error' : 'loading'}`}
+            loadingMessage={status.isBuffering ? 'Buffering audio…' : 'Loading audio…'}
+            onRetry={retryAudio}
+            timeoutMessage="This audio is taking longer than expected to load."
+          />
+        ) : null}
 
         <View style={styles.audioFocus}>
           <View style={styles.audioRing}>
@@ -154,6 +181,8 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
               accessibilityLabel={
                 status.playing ? `Pause ${session.title}` : `Play ${session.title}`
               }
+              disabled={(!status.isLoaded || Boolean(errorMessage)) && !status.playing}
+              isPending={isStarting}
               isPlaying={status.playing}
               onPress={togglePlayback}
               variant="large"
@@ -165,7 +194,9 @@ function AudioSessionPlayer({ session }: MediaPlayerProps) {
           accessibilityLabel={`${session.title} progress`}
           currentTime={currentTime}
           duration={duration}
+          onSeek={seekAudio}
           progress={progress}
+          tone="overlay"
         />
       </LinearGradient>
     </View>
@@ -178,6 +209,10 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isStarting, setIsStarting] = useState(false);
+  const [playbackStatus, setPlaybackStatus] = useState<VideoPlayerStatus>('idle');
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   const source = useMemo(
     () => ({
@@ -196,30 +231,28 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     videoPlayer.timeUpdateEventInterval = 0.5;
     videoPlayer.volume = 0.86;
   });
+  const isLoading = playbackStatus === 'idle' || playbackStatus === 'loading';
+  const errorMessage = playbackError;
 
   useEffect(() => {
     if (!isFocused) {
-      player.pause();
-      setIsPlaying(false);
-      void disableBackgroundAudioPlayback();
+      void playbackCoordinator.stop(playbackInstanceId);
     }
-  }, [isFocused, player]);
+  }, [isFocused, playbackInstanceId]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState !== 'active') {
-        player.pause();
-        setIsPlaying(false);
-        void disableBackgroundAudioPlayback();
+        void playbackCoordinator.stop(playbackInstanceId);
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [player]);
+  }, [playbackInstanceId]);
 
-  useRegisteredPlaybackPauser(playbackInstanceId, () => {
+  useRegisteredPlaybackPauser(playbackInstanceId, 'video', () => {
     player.pause();
     setIsPlaying(false);
   });
@@ -233,17 +266,72 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     setDuration(sanitizePlaybackTime(player.duration));
   });
 
-  useEventListener(player, 'statusChange', () => {
+  useEventListener(player, 'statusChange', ({ error, status: nextStatus }) => {
+    setPlaybackStatus(nextStatus);
     setDuration(sanitizePlaybackTime(player.duration));
+
+    if (nextStatus === 'error') {
+      setPlaybackError(error?.message || 'This video could not be loaded.');
+    } else if (nextStatus === 'readyToPlay') {
+      setPlaybackError(null);
+    }
+  });
+
+  useEventListener(player, 'playToEnd', () => {
+    setCurrentTime(sanitizePlaybackTime(player.duration));
+    void playbackCoordinator.stop(playbackInstanceId);
   });
 
   async function togglePlayback() {
     if (isPlaying) {
-      player.pause();
-    } else {
-      await disableBackgroundAudioPlayback();
-      pauseOtherPlayers(playbackInstanceId);
-      player.play();
+      await playbackCoordinator.stop(playbackInstanceId);
+      return;
+    }
+
+    if (playbackStatus !== 'readyToPlay' || errorMessage) {
+      return;
+    }
+
+    setIsStarting(true);
+
+    try {
+      if (duration > 0 && currentTime >= duration) {
+        player.seekBy(-currentTime);
+      }
+
+      await playbackCoordinator.start(playbackInstanceId, () => player.play());
+    } catch (error) {
+      console.warn(`Unable to play ${session.title}.`, error);
+      setPlaybackError('Playback could not start. Please try again.');
+    } finally {
+      setIsStarting(false);
+    }
+  }
+
+  async function retryVideo() {
+    await playbackCoordinator.stop(playbackInstanceId);
+    setPlaybackError(null);
+    setRetryAttempt((attempt) => attempt + 1);
+
+    try {
+      await player.replaceAsync(source);
+    } catch (error) {
+      console.warn(`Unable to reload ${session.title}.`, error);
+      setPlaybackError('This video could not be reloaded. Please try again.');
+    }
+  }
+
+  function seekVideo(time: number) {
+    if (playbackStatus !== 'readyToPlay') {
+      return;
+    }
+
+    try {
+      player.seekBy(time - currentTime);
+      setCurrentTime(time);
+    } catch (error) {
+      console.warn(`Unable to seek ${session.title}.`, error);
+      setPlaybackError('Playback could not seek to that position. Please try again.');
     }
   }
 
@@ -253,8 +341,8 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
     <View style={styles.surface}>
       <View style={styles.videoShell}>
         <VideoView
-          allowsFullscreen
           contentFit="cover"
+          fullscreenOptions={{ enable: true }}
           nativeControls={false}
           player={player}
           style={styles.video}
@@ -269,6 +357,10 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
               accessibilityLabel={
                 isPlaying ? `Pause ${session.title} video` : `Play ${session.title} video`
               }
+              disabled={
+                (playbackStatus !== 'readyToPlay' || Boolean(errorMessage)) && !isPlaying
+              }
+              isPending={isStarting}
               isPlaying={isPlaying}
               onPress={togglePlayback}
             />
@@ -277,6 +369,7 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
                 accessibilityLabel={`${session.title} video progress`}
                 currentTime={currentTime}
                 duration={duration}
+                onSeek={seekVideo}
                 progress={progress}
                 tone="overlay"
               />
@@ -286,30 +379,111 @@ function VideoSessionPlayer({ session }: MediaPlayerProps) {
       </View>
 
       <View style={styles.videoCopy}>
-        <SessionCopy session={session} />
+        {errorMessage || isLoading ? (
+          <PlaybackStatusMessage
+            errorMessage={errorMessage}
+            isLoading={isLoading && !errorMessage}
+            key={`video-${retryAttempt}-${errorMessage ? 'error' : 'loading'}`}
+            loadingMessage="Loading video…"
+            onRetry={retryVideo}
+            timeoutMessage="This video is taking longer than expected to load."
+          />
+        ) : null}
+        <SessionCopy session={session} tone="overlay" />
       </View>
     </View>
   );
 }
 
-function SessionCopy({ session }: MediaPlayerProps) {
+type PlaybackStatusMessageProps = {
+  errorMessage: string | null;
+  isLoading: boolean;
+  loadingMessage: string;
+  onRetry: () => void;
+  timeoutMessage: string;
+};
+
+function PlaybackStatusMessage({
+  errorMessage,
+  isLoading,
+  loadingMessage,
+  onRetry,
+  timeoutMessage,
+}: PlaybackStatusMessageProps) {
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading || errorMessage) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setHasTimedOut(true);
+    }, MEDIA_LOAD_TIMEOUT_MS);
+
+    return () => clearTimeout(timeout);
+  }, [errorMessage, isLoading]);
+
+  const visibleError = errorMessage ?? (hasTimedOut ? timeoutMessage : null);
+
+  if (!visibleError && !isLoading) {
+    return null;
+  }
+
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={[styles.statusMessage, visibleError && styles.errorMessage]}
+    >
+      {visibleError ? (
+        <AlertCircle color={colors.rose} size={18} />
+      ) : (
+        <ActivityIndicator color={colors.tealDeep} size="small" />
+      )}
+      <Text style={styles.statusMessageText}>{visibleError ?? loadingMessage}</Text>
+      {visibleError ? (
+        <Pressable
+          accessibilityLabel="Retry loading this session"
+          accessibilityRole="button"
+          hitSlop={theme.spacing.xs}
+          onPress={onRetry}
+          style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}
+        >
+          <RotateCcw color={colors.tealDeep} size={15} />
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+type SessionCopyProps = MediaPlayerProps & {
+  tone?: 'default' | 'overlay';
+};
+
+function SessionCopy({ session, tone = 'default' }: SessionCopyProps) {
+  const isOverlay = tone === 'overlay';
+
   return (
     <View style={styles.sessionCopy}>
-      <Text style={styles.playerEyebrow}>
+      <Text style={[styles.playerEyebrow, isOverlay && styles.overlayPlayerEyebrow]}>
         {session.mediaType === 'audio' ? 'Audio session' : 'Video session'}
       </Text>
-      <Text style={styles.playerTitle}>{session.title}</Text>
-      <Text style={styles.playerDescription}>{session.description}</Text>
+      <Text style={[styles.playerTitle, isOverlay && styles.overlayPlayerText]}>
+        {session.title}
+      </Text>
+      <Text style={[styles.playerDescription, isOverlay && styles.overlayPlayerDescription]}>
+        {session.description}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   surface: {
-    backgroundColor: colors.warmWhite,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: colors.deepOcean,
     borderRadius: theme.radius.lg,
-    borderWidth: 1,
+    elevation: 5,
     gap: theme.spacing.md,
     overflow: 'hidden',
     shadowColor: colors.shadow,
@@ -319,7 +493,42 @@ const styles = StyleSheet.create({
   },
   audioGradient: {
     gap: theme.spacing.xl,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.xl,
+  },
+  statusMessage: {
+    alignItems: 'center',
+    backgroundColor: colors.tealMist,
+    borderRadius: theme.radius.lg,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.sm,
+  },
+  errorMessage: {
+    backgroundColor: colors.roseSoft,
+  },
+  statusMessageText: {
+    color: colors.inkMuted,
+    flex: 1,
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: theme.typography.size.sm,
+    lineHeight: theme.typography.lineHeight.md,
+  },
+  retryButton: {
+    alignItems: 'center',
+    backgroundColor: colors.offWhiteTransparent,
+    borderRadius: theme.radius.full,
+    flexDirection: 'row',
+    gap: theme.spacing.xxs,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+  },
+  retryButtonPressed: {
+    opacity: 0.72,
+  },
+  retryButtonText: {
+    color: colors.tealDeep,
+    fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.xs,
   },
   audioFocus: {
     alignItems: 'center',
@@ -328,8 +537,8 @@ const styles = StyleSheet.create({
   },
   audioRing: {
     alignItems: 'center',
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: colors.whiteFaint,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
     height: 138,
@@ -341,6 +550,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   videoCopy: {
+    gap: theme.spacing.md,
     paddingBottom: theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
   },
@@ -365,6 +575,15 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.md,
     textAlign: 'center',
+  },
+  overlayPlayerEyebrow: {
+    color: colors.teal,
+  },
+  overlayPlayerText: {
+    color: colors.white,
+  },
+  overlayPlayerDescription: {
+    color: colors.whiteMuted,
   },
   videoShell: {
     aspectRatio: 16 / 10,

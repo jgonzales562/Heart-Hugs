@@ -10,7 +10,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';
 
 import { GradientScreen } from './src/components/GradientScreen';
-import { DISCLAIMER_ACCEPTED_KEY } from './src/constants/storage';
+import { WELLNESS_DISCLAIMER_VERSION } from './src/constants/disclaimer';
+import { DISCLAIMER_ACCEPTANCE_KEY } from './src/constants/storage';
 import { AboutScreen } from './src/screens/AboutScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
@@ -18,6 +19,12 @@ import { PlayerScreen } from './src/screens/PlayerScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { colors, theme } from './src/theme';
 import { MainTabParamList, RootStackParamList } from './src/types/navigation';
+import {
+  createDisclaimerAcceptance,
+  hasAcceptedDisclaimerVersion,
+  isLegacyDisclaimerAcceptance,
+  serializeDisclaimerAcceptance,
+} from './src/utils/disclaimerAcceptance';
 
 enableScreens();
 
@@ -28,11 +35,11 @@ const navigationTheme = {
   ...NavigationDefaultTheme,
   colors: {
     ...NavigationDefaultTheme.colors,
-    background: colors.offWhite,
-    border: colors.lavenderMuted,
-    card: colors.offWhite,
+    background: colors.deepOcean,
+    border: 'rgba(255, 255, 255, 0.12)',
+    card: colors.deepOcean,
     primary: colors.teal,
-    text: colors.navy,
+    text: colors.offWhite,
   },
 };
 
@@ -41,8 +48,10 @@ function AppTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.tealDeep,
-        tabBarInactiveTintColor: colors.slate,
+        tabBarActiveTintColor: colors.white,
+        tabBarActiveBackgroundColor: colors.ocean,
+        tabBarInactiveTintColor: colors.whiteMuted,
+        tabBarHideOnKeyboard: true,
         tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
         tabBarStyle: styles.tabBar,
@@ -90,21 +99,43 @@ function RootNavigator() {
 
 export default function App() {
   const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = useState<boolean | null>(null);
+  const [isAcceptingDisclaimer, setIsAcceptingDisclaimer] = useState(false);
+  const [disclaimerError, setDisclaimerError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function hydrateDisclaimerState() {
-      const storedValue = await AsyncStorage.getItem(DISCLAIMER_ACCEPTED_KEY);
+      const storedValue = await AsyncStorage.getItem(DISCLAIMER_ACCEPTANCE_KEY);
+      const hasAcceptedCurrentVersion = hasAcceptedDisclaimerVersion(
+        storedValue,
+        WELLNESS_DISCLAIMER_VERSION
+      );
+
+      if (isLegacyDisclaimerAcceptance(storedValue)) {
+        const migratedAcceptance = createDisclaimerAcceptance(WELLNESS_DISCLAIMER_VERSION);
+
+        await AsyncStorage.setItem(
+          DISCLAIMER_ACCEPTANCE_KEY,
+          serializeDisclaimerAcceptance(migratedAcceptance)
+        ).catch((error) => {
+          console.warn('Unable to migrate legacy disclaimer acceptance.', error);
+        });
+      }
 
       if (isMounted) {
-        setHasAcceptedDisclaimer(storedValue === 'true');
+        setHasAcceptedDisclaimer(hasAcceptedCurrentVersion);
       }
     }
 
-    hydrateDisclaimerState().catch(() => {
+    hydrateDisclaimerState().catch((error) => {
+      console.warn('Unable to load disclaimer acceptance.', error);
+
       if (isMounted) {
         setHasAcceptedDisclaimer(false);
+        setDisclaimerError(
+          'We could not verify your previous acceptance. Please review and accept the disclaimer.'
+        );
       }
     });
 
@@ -114,26 +145,48 @@ export default function App() {
   }, []);
 
   async function acceptDisclaimer() {
-    await AsyncStorage.setItem(DISCLAIMER_ACCEPTED_KEY, 'true');
-    setHasAcceptedDisclaimer(true);
+    if (isAcceptingDisclaimer) {
+      return;
+    }
+
+    setIsAcceptingDisclaimer(true);
+    setDisclaimerError(null);
+
+    try {
+      const acceptance = createDisclaimerAcceptance(WELLNESS_DISCLAIMER_VERSION);
+      await AsyncStorage.setItem(
+        DISCLAIMER_ACCEPTANCE_KEY,
+        serializeDisclaimerAcceptance(acceptance)
+      );
+      setHasAcceptedDisclaimer(true);
+    } catch (error) {
+      console.warn('Unable to save disclaimer acceptance.', error);
+      setDisclaimerError('Your acceptance could not be saved. Please try again.');
+    } finally {
+      setIsAcceptingDisclaimer(false);
+    }
   }
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       {hasAcceptedDisclaimer === null ? (
-        <GradientScreen contentContainerStyle={styles.loadingScreen}>
+        <GradientScreen contentContainerStyle={styles.loadingScreen} includeBottomSafeArea>
           <View style={styles.brandMark}>
             <Heart color={colors.rose} fill={colors.roseSoft} size={28} />
           </View>
-          <ActivityIndicator color={colors.tealDeep} />
+          <ActivityIndicator color={colors.teal} />
         </GradientScreen>
       ) : hasAcceptedDisclaimer ? (
         <NavigationContainer theme={navigationTheme}>
           <RootNavigator />
         </NavigationContainer>
       ) : (
-        <WelcomeScreen onAccept={acceptDisclaimer} />
+        <WelcomeScreen
+          errorMessage={disclaimerError}
+          isAccepting={isAcceptingDisclaimer}
+          onAccept={acceptDisclaimer}
+        />
       )}
     </SafeAreaProvider>
   );
@@ -141,11 +194,16 @@ export default function App() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.offWhite,
-    borderTopColor: colors.lavenderMuted,
-    height: 76,
-    paddingBottom: theme.spacing.md,
-    paddingTop: theme.spacing.xs,
+    backgroundColor: colors.deepOcean,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    height: 82,
+    paddingBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    shadowColor: colors.shadow,
+    shadowOffset: { height: -8, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
   },
   tabItem: {
     borderRadius: theme.radius.md,

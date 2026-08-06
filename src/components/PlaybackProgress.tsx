@@ -1,4 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type AccessibilityActionEvent,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
+} from 'react-native';
 
 import { colors, theme } from '../theme';
 import { formatPlaybackTime } from '../utils/time';
@@ -7,6 +16,7 @@ type PlaybackProgressProps = {
   accessibilityLabel?: string;
   currentTime?: number;
   duration?: number;
+  onSeek?: (time: number) => void | Promise<void>;
   progress?: number;
   tone?: 'soft' | 'overlay';
 };
@@ -33,35 +43,70 @@ export function getPlaybackProgress(currentTime?: number, duration?: number) {
   return clampPlaybackProgress(sanitizePlaybackTime(currentTime) / safeDuration);
 }
 
+export function getPlaybackSeekTime(locationX?: number, width?: number, duration?: number) {
+  const safeWidth = sanitizePlaybackTime(width);
+
+  if (safeWidth <= 0) {
+    return 0;
+  }
+
+  return clampPlaybackProgress(sanitizePlaybackTime(locationX) / safeWidth) * sanitizePlaybackTime(duration);
+}
+
 export function PlaybackProgress({
   accessibilityLabel,
   currentTime,
   duration,
+  onSeek,
   progress,
   tone = 'soft',
 }: PlaybackProgressProps) {
+  const trackWidth = useRef(0);
   const safeCurrentTime = sanitizePlaybackTime(currentTime);
   const safeDuration = sanitizePlaybackTime(duration);
   const clampedProgress = clampPlaybackProgress(progress);
   const accessibilityMax = safeDuration || 1;
   const accessibilityNow = safeDuration ? Math.min(safeCurrentTime, safeDuration) : 0;
   const isOverlay = tone === 'overlay';
+  const isSeekEnabled = Boolean(onSeek) && safeDuration > 0;
+
+  function requestSeek(time: number) {
+    if (!onSeek || !isSeekEnabled) {
+      return;
+    }
+
+    try {
+      const result = onSeek(Math.min(sanitizePlaybackTime(time), safeDuration));
+      if (result) {
+        void result.catch((error) => console.warn('Unable to seek playback.', error));
+      }
+    } catch (error) {
+      console.warn('Unable to seek playback.', error);
+    }
+  }
+
+  function handleTrackLayout(event: LayoutChangeEvent) {
+    trackWidth.current = event.nativeEvent.layout.width;
+  }
+
+  function handleTrackPress(event: GestureResponderEvent) {
+    requestSeek(
+      getPlaybackSeekTime(event.nativeEvent.locationX, trackWidth.current, safeDuration)
+    );
+  }
+
+  function handleAccessibilityAction(event: AccessibilityActionEvent) {
+    const seekStep = Math.max(5, safeDuration * 0.05);
+
+    if (event.nativeEvent.actionName === 'increment') {
+      requestSeek(safeCurrentTime + seekStep);
+    } else if (event.nativeEvent.actionName === 'decrement') {
+      requestSeek(safeCurrentTime - seekStep);
+    }
+  }
 
   return (
-    <View
-      accessibilityLabel={
-        accessibilityLabel ??
-        `Playback progress ${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`
-      }
-      accessibilityRole="progressbar"
-      accessibilityValue={{
-        max: accessibilityMax,
-        min: 0,
-        now: accessibilityNow,
-        text: `${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`,
-      }}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <View style={styles.timeRow}>
         <Text style={[styles.timeText, isOverlay && styles.overlayTimeText]}>
           {formatPlaybackTime(safeCurrentTime)}
@@ -70,7 +115,35 @@ export function PlaybackProgress({
           {formatPlaybackTime(safeDuration)}
         </Text>
       </View>
-      <View style={[styles.track, isOverlay && styles.overlayTrack]}>
+      <Pressable
+        accessibilityActions={
+          isSeekEnabled
+            ? [
+                { label: 'Seek forward', name: 'increment' },
+                { label: 'Seek backward', name: 'decrement' },
+              ]
+            : undefined
+        }
+        accessibilityHint={isSeekEnabled ? 'Tap or adjust to seek through this session.' : undefined}
+        accessibilityLabel={
+          accessibilityLabel ??
+          `Playback progress ${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`
+        }
+        accessibilityRole={isSeekEnabled ? 'adjustable' : 'progressbar'}
+        accessibilityState={{ disabled: !isSeekEnabled }}
+        accessibilityValue={{
+          max: accessibilityMax,
+          min: 0,
+          now: accessibilityNow,
+          text: `${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`,
+        }}
+        disabled={!isSeekEnabled}
+        hitSlop={{ bottom: 10, top: 10 }}
+        onAccessibilityAction={handleAccessibilityAction}
+        onLayout={handleTrackLayout}
+        onPress={handleTrackPress}
+        style={[styles.track, isOverlay && styles.overlayTrack]}
+      >
         <View
           style={[
             styles.fill,
@@ -78,7 +151,7 @@ export function PlaybackProgress({
             { width: `${clampedProgress * 100}%` },
           ]}
         />
-      </View>
+      </Pressable>
     </View>
   );
 }

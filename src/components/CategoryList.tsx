@@ -43,22 +43,25 @@ export function CategoryList({
 const styles = StyleSheet.create({
   container: {
     gap: theme.spacing.sm,
+    paddingBottom: theme.spacing.xs,
     paddingRight: theme.spacing.lg,
   },
   category: {
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    elevation: 1,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 11,
   },
   selectedCategory: {
-    backgroundColor: colors.navy,
-    borderColor: colors.navy,
+    backgroundColor: colors.deepOcean,
+    borderColor: colors.deepOcean,
+    elevation: 4,
   },
   categoryText: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.sm,

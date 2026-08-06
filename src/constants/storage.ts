@@ -1,1 +1,1 @@
-export const DISCLAIMER_ACCEPTED_KEY = '@heart-hugs/disclaimer-accepted';
+export const DISCLAIMER_ACCEPTANCE_KEY = '@heart-hugs/disclaimer-accepted';

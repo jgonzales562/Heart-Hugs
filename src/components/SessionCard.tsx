@@ -8,12 +8,13 @@ import { Session } from '../types/session';
 type SessionCardProps = {
   onPress: (session: Session) => void;
   session: Session;
-  variant?: 'large' | 'compact';
+  variant?: 'large' | 'compact' | 'tile';
 };
 
 export function SessionCard({ onPress, session, variant = 'compact' }: SessionCardProps) {
   const MediaIcon = session.mediaType === 'audio' ? Headphones : Video;
   const isLarge = variant === 'large';
+  const isTile = variant === 'tile';
   const highlights = [session.tags[0], session.benefits[0]]
     .filter((highlight): highlight is string => Boolean(highlight))
     .slice(0, 2);
@@ -25,7 +26,7 @@ export function SessionCard({ onPress, session, variant = 'compact' }: SessionCa
       onPress={() => onPress(session)}
       style={({ pressed }) => [
         styles.card,
-        isLarge ? styles.largeCard : styles.compactCard,
+        isLarge ? styles.largeCard : isTile ? styles.tileCard : styles.compactCard,
         pressed && styles.pressed,
       ]}
     >
@@ -35,7 +36,8 @@ export function SessionCard({ onPress, session, variant = 'compact' }: SessionCa
         style={styles.imageBackground}
       >
         <LinearGradient
-          colors={['rgba(23, 42, 68, 0.12)', 'rgba(23, 42, 68, 0.72)']}
+          colors={['rgba(6, 30, 48, 0.04)', 'rgba(6, 30, 48, 0.2)', 'rgba(6, 30, 48, 0.88)']}
+          locations={[0, 0.42, 1]}
           style={styles.overlay}
         >
           <View style={styles.topRow}>
@@ -56,26 +58,32 @@ export function SessionCard({ onPress, session, variant = 'compact' }: SessionCa
             <Text numberOfLines={2} style={[styles.title, isLarge && styles.largeTitle]}>
               {session.title}
             </Text>
-            <Text numberOfLines={isLarge ? 3 : 2} style={styles.description}>
+            <Text numberOfLines={isLarge ? 3 : isTile ? 2 : 1} style={styles.description}>
               {session.description}
             </Text>
-            <View style={styles.highlightRow}>
-              {highlights.map((highlight) => (
-                <View key={highlight} style={styles.highlightPill}>
-                  <Text numberOfLines={1} style={styles.highlightText}>
-                    {highlight}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            {isLarge ? (
+              <View style={styles.highlightRow}>
+                {highlights.map((highlight) => (
+                  <View key={highlight} style={styles.highlightPill}>
+                    <Text numberOfLines={1} style={styles.highlightText}>
+                      {highlight}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
                 <Clock color={colors.offWhite} size={14} />
                 <Text style={styles.metaText}>{session.durationMinutes} min</Text>
               </View>
-              <Text style={styles.metaDivider}>/</Text>
-              <Text style={styles.metaText}>{session.difficulty}</Text>
-              <Text style={styles.metaDivider}>/</Text>
+              {isLarge ? (
+                <>
+                  <Text style={styles.metaDivider}>/</Text>
+                  <Text style={styles.metaText}>{session.difficulty}</Text>
+                  <Text style={styles.metaDivider}>/</Text>
+                </>
+              ) : null}
               <Text style={styles.metaText}>{session.category}</Text>
               <ChevronRight color={colors.offWhite} size={18} style={styles.chevron} />
             </View>
@@ -90,6 +98,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.navy,
     borderRadius: theme.radius.lg,
+    elevation: 5,
     overflow: 'hidden',
     shadowColor: colors.shadow,
     shadowOffset: { height: 10, width: 0 },
@@ -97,10 +106,14 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
   },
   compactCard: {
-    height: 240,
+    height: 196,
   },
   largeCard: {
-    height: 280,
+    height: 310,
+  },
+  tileCard: {
+    height: 268,
+    width: 218,
   },
   pressed: {
     opacity: 0.88,
@@ -115,7 +128,7 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'space-between',
-    padding: theme.spacing.md,
+    padding: theme.spacing.lg,
   },
   topRow: {
     alignItems: 'center',
@@ -123,7 +136,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   featuredPill: {
-    backgroundColor: colors.offWhiteTransparent,
+    backgroundColor: colors.white,
     borderRadius: theme.radius.full,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xxs,
@@ -141,7 +154,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xxs,
+    paddingVertical: 6,
   },
   mediaText: {
     color: colors.offWhite,
@@ -156,19 +169,19 @@ const styles = StyleSheet.create({
   title: {
     color: colors.offWhite,
     fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: theme.typography.size.xl,
-    lineHeight: theme.typography.lineHeight.xl,
+    fontSize: 22,
+    lineHeight: 28,
   },
   largeTitle: {
-    fontSize: theme.typography.size.xxl,
-    lineHeight: theme.typography.lineHeight.xxl,
+    fontSize: 30,
+    lineHeight: 36,
   },
   description: {
     color: colors.offWhite,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.md,
-    opacity: 0.94,
+    opacity: 0.9,
   },
   metaRow: {
     alignItems: 'center',

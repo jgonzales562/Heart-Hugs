@@ -1,22 +1,29 @@
 export const colors = {
-  navy: '#172A44',
-  navySoft: '#243D5D',
-  teal: '#70C8C0',
-  tealDeep: '#267C79',
-  tealMist: '#D8F1EE',
-  lavender: '#C8B8EA',
-  lavenderMuted: '#DDD4F0',
-  lavenderSoft: '#F1ECFA',
-  offWhite: '#FFF9F0',
-  offWhiteTransparent: 'rgba(255, 249, 240, 0.78)',
-  warmWhite: '#FFFDF9',
-  rose: '#C7798A',
-  roseSoft: '#F5D8DE',
-  sage: '#8EA690',
-  slate: '#657083',
-  inkMuted: '#4E5B6D',
-  shadow: 'rgba(23, 42, 68, 0.12)',
-  transparentNavy: 'rgba(23, 42, 68, 0.58)',
+  navy: '#102F46',
+  navySoft: '#1C4B63',
+  teal: '#75C7C1',
+  tealDeep: '#267A7B',
+  tealMist: '#9DD8D1',
+  lavender: '#BFCBDD',
+  lavenderMuted: '#AABDD1',
+  lavenderSoft: '#BBC8E0',
+  offWhite: '#F7FAF8',
+  offWhiteTransparent: 'rgba(201, 231, 227, 0.84)',
+  warmWhite: '#D7EAE6',
+  rose: '#E58A78',
+  roseSoft: '#F7E2E2',
+  sage: '#7EA79A',
+  slate: '#6F7F88',
+  inkMuted: '#536A75',
+  shadow: 'rgba(16, 47, 70, 0.16)',
+  transparentNavy: 'rgba(10, 38, 58, 0.64)',
+  deepOcean: '#092A40',
+  ocean: '#16536B',
+  sky: '#8BC9D1',
+  white: '#FFFFFF',
+  whiteMuted: 'rgba(255, 255, 255, 0.76)',
+  whiteFaint: 'rgba(255, 255, 255, 0.16)',
+  hairline: 'rgba(16, 47, 70, 0.09)',
 };
 
 export const typography = {
@@ -28,17 +35,17 @@ export const typography = {
   lineHeight: {
     sm: 18,
     md: 22,
-    lg: 26,
-    xl: 32,
-    xxl: 40,
+    lg: 27,
+    xl: 33,
+    xxl: 43,
   },
   size: {
     xs: 11,
     sm: 13,
     md: 15,
     lg: 18,
-    xl: 24,
-    xxl: 32,
+    xl: 25,
+    xxl: 34,
   },
 };
 
@@ -53,17 +60,19 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 4,
-  md: 6,
-  lg: 8,
+  sm: 12,
+  md: 18,
+  lg: 28,
   full: 999,
 };
 
 export const gradients = {
-  accent: [colors.teal, colors.lavender] as const,
-  card: [colors.warmWhite, colors.lavenderSoft] as const,
-  quietNight: [colors.navy, colors.navySoft, colors.tealDeep] as const,
-  screen: [colors.offWhite, colors.lavenderSoft, colors.tealMist] as const,
+  accent: [colors.teal, colors.sky] as const,
+  card: ['#9FD9D1', '#AFC3DF'] as const,
+  quietNight: [colors.deepOcean, colors.navy, colors.ocean] as const,
+  player: [colors.ocean, colors.deepOcean] as const,
+  screen: [colors.deepOcean, '#0E5E67', '#594B7D'] as const,
+  welcome: [colors.deepOcean, colors.ocean, '#4D929C'] as const,
 };
 
 export const theme = {

@@ -1,17 +1,19 @@
-import { Heart, ShieldCheck } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AlertCircle, Heart, ShieldCheck } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { GradientScreen } from '../components/GradientScreen';
 import { WELLNESS_DISCLAIMER } from '../constants/disclaimer';
 import { colors, gradients, theme } from '../theme';
 
 type WelcomeScreenProps = {
+  errorMessage: string | null;
+  isAccepting: boolean;
   onAccept: () => Promise<void>;
 };
 
-export function WelcomeScreen({ onAccept }: WelcomeScreenProps) {
+export function WelcomeScreen({ errorMessage, isAccepting, onAccept }: WelcomeScreenProps) {
   return (
-    <GradientScreen gradientColors={gradients.screen} scroll>
+    <GradientScreen gradientColors={gradients.welcome} includeBottomSafeArea scroll>
       <View style={styles.hero}>
         <View style={styles.brandMark}>
           <Heart color={colors.rose} fill={colors.roseSoft} size={32} />
@@ -22,18 +24,34 @@ export function WelcomeScreen({ onAccept }: WelcomeScreenProps) {
 
       <View style={styles.disclaimerPanel}>
         <View style={styles.panelHeader}>
-          <ShieldCheck color={colors.tealDeep} size={22} />
+          <ShieldCheck color={colors.teal} size={22} />
           <Text style={styles.panelTitle}>Wellness Disclaimer</Text>
         </View>
         <Text style={styles.disclaimerText}>{WELLNESS_DISCLAIMER}</Text>
       </View>
 
+      {errorMessage ? (
+        <View accessibilityLiveRegion="assertive" style={styles.errorPanel}>
+          <AlertCircle color={colors.rose} size={19} />
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ busy: isAccepting, disabled: isAccepting }}
+        disabled={isAccepting}
         onPress={onAccept}
-        style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.acceptButton,
+          isAccepting && styles.acceptButtonDisabled,
+          pressed && styles.pressed,
+        ]}
       >
-        <Text style={styles.acceptText}>I understand and agree</Text>
+        {isAccepting ? <ActivityIndicator color={colors.offWhite} size="small" /> : null}
+        <Text style={styles.acceptText}>
+          {isAccepting ? 'Saving acceptance…' : 'I understand and agree'}
+        </Text>
       </Pressable>
     </GradientScreen>
   );
@@ -48,8 +66,8 @@ const styles = StyleSheet.create({
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: colors.whiteFaint,
+    borderColor: 'rgba(255, 255, 255, 0.26)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
     height: 74,
@@ -57,22 +75,22 @@ const styles = StyleSheet.create({
     width: 74,
   },
   brand: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xxl,
     lineHeight: theme.typography.lineHeight.xxl,
     textAlign: 'center',
   },
   subtitle: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.lg,
     lineHeight: theme.typography.lineHeight.lg,
     textAlign: 'center',
   },
   disclaimerPanel: {
-    backgroundColor: colors.warmWhite,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: 'rgba(7, 31, 49, 0.7)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     gap: theme.spacing.md,
@@ -84,21 +102,23 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   panelTitle: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.lg,
     lineHeight: theme.typography.lineHeight.lg,
   },
   disclaimerText: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.lg,
   },
   acceptButton: {
     alignItems: 'center',
-    backgroundColor: colors.navy,
+    backgroundColor: colors.tealDeep,
     borderRadius: theme.radius.full,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
     marginBottom: theme.spacing.xl,
     marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
@@ -106,6 +126,27 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.88,
+  },
+  acceptButtonDisabled: {
+    opacity: 0.72,
+  },
+  errorPanel: {
+    alignItems: 'center',
+    backgroundColor: colors.roseSoft,
+    borderColor: colors.rose,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  errorText: {
+    color: colors.navy,
+    flex: 1,
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: theme.typography.size.sm,
+    lineHeight: theme.typography.lineHeight.md,
   },
   acceptText: {
     color: colors.offWhite,

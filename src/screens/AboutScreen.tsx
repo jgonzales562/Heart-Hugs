@@ -1,21 +1,22 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { BadgeCheck, HeartHandshake, ShieldCheck } from 'lucide-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { GradientScreen } from '../components/GradientScreen';
 import { WELLNESS_DISCLAIMER } from '../constants/disclaimer';
 import { therapistProfile } from '../data/therapist';
-import { colors, theme } from '../theme';
+import { colors, gradients, theme } from '../theme';
 
 export function AboutScreen() {
   return (
     <GradientScreen scroll>
-      <View style={styles.header}>
+      <LinearGradient colors={gradients.quietNight} style={styles.header}>
         <View style={styles.iconMark}>
-          <HeartHandshake color={colors.tealDeep} size={26} />
+          <HeartHandshake color={colors.white} size={26} />
         </View>
         <Text style={styles.title}>About</Text>
         <Text style={styles.subtitle}>{therapistProfile.role}</Text>
-      </View>
+      </LinearGradient>
 
       <View style={styles.profilePanel}>
         <Text style={styles.name}>{therapistProfile.name}</Text>
@@ -27,7 +28,7 @@ export function AboutScreen() {
         <View style={styles.credentialsList}>
           {therapistProfile.credentials.map((credential) => (
             <View key={credential} style={styles.credentialRow}>
-              <BadgeCheck color={colors.tealDeep} size={18} />
+              <BadgeCheck color={colors.teal} size={18} />
               <Text style={styles.credentialText}>{credential}</Text>
             </View>
           ))}
@@ -48,12 +49,14 @@ export function AboutScreen() {
 const styles = StyleSheet.create({
   header: {
     gap: theme.spacing.sm,
-    paddingBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
   },
   iconMark: {
     alignItems: 'center',
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: colors.whiteFaint,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
     height: 54,
@@ -61,33 +64,33 @@ const styles = StyleSheet.create({
     width: 54,
   },
   title: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xxl,
     lineHeight: theme.typography.lineHeight.xxl,
   },
   subtitle: {
-    color: colors.tealDeep,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.md,
   },
   profilePanel: {
-    backgroundColor: colors.warmWhite,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: 'rgba(7, 31, 49, 0.68)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     gap: theme.spacing.sm,
     padding: theme.spacing.lg,
   },
   name: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xl,
     lineHeight: theme.typography.lineHeight.xl,
   },
   bio: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.lg,
@@ -97,7 +100,7 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xl,
   },
   sectionTitle: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.lg,
     lineHeight: theme.typography.lineHeight.lg,
@@ -107,8 +110,8 @@ const styles = StyleSheet.create({
   },
   credentialRow: {
     alignItems: 'center',
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: 'rgba(73, 65, 112, 0.68)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
@@ -116,14 +119,14 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   credentialText: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     flex: 1,
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.md,
   },
   disclaimerPanel: {
-    backgroundColor: colors.warmWhite,
+    backgroundColor: 'rgba(91, 66, 116, 0.74)',
     borderColor: colors.roseSoft,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
@@ -138,13 +141,13 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   disclaimerTitle: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.lg,
     lineHeight: theme.typography.lineHeight.lg,
   },
   disclaimerText: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.md,

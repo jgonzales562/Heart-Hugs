@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { X } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
+import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ArrowLeft, Clock3, X } from 'lucide-react-native';
 
 import { GradientScreen } from '../components/GradientScreen';
 import { MediaPlayer } from '../components/MediaPlayer';
@@ -10,7 +11,7 @@ import { colors, theme } from '../theme';
 import { RootStackScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
 
-export function PlayerScreen({ route }: RootStackScreenProps<'Player'>) {
+export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player'>) {
   const [inlineSessionId, setInlineSessionId] = useState<string | null>(null);
   const [isActivePlayerOpen, setIsActivePlayerOpen] = useState(true);
   const activeSession = getSessionById(route.params.sessionId) ?? getDefaultSession();
@@ -22,11 +23,6 @@ export function PlayerScreen({ route }: RootStackScreenProps<'Player'>) {
         allSessions.findIndex((candidate) => candidate.id === session.id) === index
     )
     .slice(0, 2);
-
-  useEffect(() => {
-    setInlineSessionId(null);
-    setIsActivePlayerOpen(true);
-  }, [activeSession.id]);
 
   function openActivePlayer() {
     setIsActivePlayerOpen(true);
@@ -45,31 +41,67 @@ export function PlayerScreen({ route }: RootStackScreenProps<'Player'>) {
   }
 
   return (
-    <GradientScreen scroll>
-      <View style={styles.header}>
-        <Text style={styles.title}>Player</Text>
-        <Text style={styles.subtitle}>{activeSession.category}</Text>
-      </View>
+    <GradientScreen contentContainerStyle={styles.screen} includeBottomSafeArea scroll>
+      <ImageBackground
+        imageStyle={styles.heroImage}
+        source={{ uri: activeSession.thumbnailUrl }}
+        style={styles.hero}
+      >
+        <LinearGradient
+          colors={['rgba(6, 29, 47, 0.18)', 'rgba(6, 29, 47, 0.82)']}
+          style={styles.heroOverlay}
+        >
+          <Pressable
+            accessibilityLabel="Return to the previous screen"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={navigation.goBack}
+            style={({ pressed }) => [styles.backButton, pressed && styles.closeButtonPressed]}
+          >
+            <ArrowLeft color={colors.white} size={22} />
+          </Pressable>
+
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>{activeSession.category}</Text>
+            <Text style={styles.title}>{activeSession.title}</Text>
+            <View style={styles.heroMetaRow}>
+              <Clock3 color={colors.whiteMuted} size={15} />
+              <Text style={styles.heroMeta}>{activeSession.durationMinutes} min</Text>
+              <Text style={styles.heroMetaDivider}>·</Text>
+              <Text style={styles.heroMeta}>{activeSession.difficulty}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </ImageBackground>
 
       {isActivePlayerOpen ? (
         <View style={styles.activeSession}>
-          <Pressable
-            accessibilityLabel={`Close ${activeSession.title} player`}
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={closeActivePlayer}
-            style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
-          >
-            <X color={colors.navy} size={18} />
-          </Pressable>
-          <SessionContext session={activeSession} />
+          <View style={styles.activeHeader}>
+            <View>
+              <Text style={styles.sectionEyebrow}>NOW PLAYING</Text>
+              <Text style={styles.activeTitle}>Your session</Text>
+            </View>
+            <Pressable
+              accessibilityLabel={`Close ${activeSession.title} player`}
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={closeActivePlayer}
+              style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
+            >
+              <X color={colors.white} size={18} />
+            </Pressable>
+          </View>
           <MediaPlayer key={activeSession.id} session={activeSession} />
+          <SessionContext session={activeSession} />
         </View>
       ) : (
-        <SessionCard onPress={openActivePlayer} session={activeSession} />
+        <View style={styles.activeSession}>
+          <SessionCard onPress={openActivePlayer} session={activeSession} />
+        </View>
       )}
 
       <View style={styles.section}>
+        <Text style={styles.sectionEyebrow}>KEEP EXPLORING</Text>
         <Text style={styles.sectionTitle}>More for this moment</Text>
         <View style={styles.sessionList}>
           {relatedSessions.map((session) =>
@@ -82,7 +114,7 @@ export function PlayerScreen({ route }: RootStackScreenProps<'Player'>) {
                   onPress={closeInlineSession}
                   style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
                 >
-                  <X color={colors.navy} size={18} />
+                  <X color={colors.white} size={18} />
                 </Pressable>
                 <SessionContext compact session={session} />
                 <MediaPlayer key={session.id} session={session} />
@@ -134,21 +166,67 @@ function SessionContext({ compact = false, session }: SessionContextProps) {
 }
 
 const styles = StyleSheet.create({
-  header: {
+  screen: {
+    paddingBottom: theme.spacing.xl,
+    paddingTop: theme.spacing.sm,
+  },
+  hero: {
+    height: 286,
+    marginBottom: theme.spacing.xl,
+  },
+  heroImage: {
+    borderRadius: 34,
+  },
+  heroOverlay: {
+    borderRadius: 34,
+    flex: 1,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    padding: theme.spacing.lg,
+  },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(8, 37, 56, 0.38)',
+    borderColor: 'rgba(255, 255, 255, 0.26)',
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  heroCopy: {
     gap: theme.spacing.xs,
-    paddingBottom: theme.spacing.lg,
+  },
+  heroEyebrow: {
+    color: colors.whiteMuted,
+    fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.xs,
+    letterSpacing: 1.7,
+    lineHeight: theme.typography.lineHeight.sm,
+    textTransform: 'uppercase',
   },
   title: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: theme.typography.size.xxl,
-    lineHeight: theme.typography.lineHeight.xxl,
+    fontSize: 34,
+    letterSpacing: -0.8,
+    lineHeight: 40,
   },
-  subtitle: {
-    color: colors.tealDeep,
+  heroMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+    paddingTop: theme.spacing.xs,
+  },
+  heroMeta: {
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.medium,
-    fontSize: theme.typography.size.md,
-    lineHeight: theme.typography.lineHeight.md,
+    fontSize: theme.typography.size.sm,
+    lineHeight: theme.typography.lineHeight.sm,
+  },
+  heroMetaDivider: {
+    color: colors.whiteMuted,
+    fontSize: theme.typography.size.sm,
   },
   section: {
     gap: theme.spacing.md,
@@ -156,10 +234,17 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xl,
   },
   sectionTitle: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: theme.typography.size.lg,
-    lineHeight: theme.typography.lineHeight.lg,
+    fontSize: theme.typography.size.xl,
+    lineHeight: theme.typography.lineHeight.xl,
+  },
+  sectionEyebrow: {
+    color: colors.teal,
+    fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.xs,
+    letterSpacing: 1.5,
+    lineHeight: theme.typography.lineHeight.sm,
   },
   sessionList: {
     gap: theme.spacing.md,
@@ -167,14 +252,25 @@ const styles = StyleSheet.create({
   activeSession: {
     gap: theme.spacing.md,
   },
+  activeHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  activeTitle: {
+    color: colors.white,
+    fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.xl,
+    lineHeight: theme.typography.lineHeight.xl,
+  },
   inlineSession: {
     gap: theme.spacing.md,
   },
   closeButton: {
     alignItems: 'center',
     alignSelf: 'flex-end',
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
     height: 36,
@@ -186,10 +282,11 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.96 }],
   },
   sessionContext: {
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.lavenderMuted,
-    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(7, 31, 49, 0.64)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: theme.radius.md,
     borderWidth: 1,
+    elevation: 2,
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
     padding: theme.spacing.md,
@@ -204,27 +301,27 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   contextMeta: {
-    color: colors.tealDeep,
+    color: colors.teal,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.sm,
   },
   contextDivider: {
-    color: colors.lavender,
+    color: colors.whiteMuted,
     fontSize: theme.typography.size.sm,
   },
   contextBlock: {
     gap: theme.spacing.xxs,
   },
   contextLabel: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xs,
     lineHeight: theme.typography.lineHeight.sm,
     textTransform: 'uppercase',
   },
   contextText: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.md,
@@ -235,15 +332,15 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   tagPill: {
-    backgroundColor: colors.warmWhite,
-    borderColor: colors.lavenderMuted,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
     paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xxs,
+    paddingVertical: 6,
   },
   tagText: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.xs,
     lineHeight: theme.typography.lineHeight.sm,
