@@ -92,6 +92,14 @@ export class PlaybackCoordinator {
     return this.enqueue(() => this.releaseBackgroundAudioWhenUnused());
   }
 
+  finish(id: string): Promise<void> {
+    if (this.desiredPlaybackId === id) {
+      this.desiredPlaybackId = null;
+    }
+
+    return this.enqueue(() => this.releaseBackgroundAudioWhenUnused());
+  }
+
   private enqueue<T>(transition: () => Promise<T>): Promise<T> {
     const result = this.transitionQueue.then(transition, transition);
     this.transitionQueue = result.then(

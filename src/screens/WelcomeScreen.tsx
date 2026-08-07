@@ -24,7 +24,7 @@ export function WelcomeScreen({ errorMessage, isAccepting, onAccept }: WelcomeSc
 
       <View style={styles.disclaimerPanel}>
         <View style={styles.panelHeader}>
-          <ShieldCheck color={colors.teal} size={22} />
+          <ShieldCheck color={colors.leafDeep} size={22} />
           <Text style={styles.panelTitle}>Wellness Disclaimer</Text>
         </View>
         <Text style={styles.disclaimerText}>{WELLNESS_DISCLAIMER}</Text>
@@ -66,8 +66,8 @@ const styles = StyleSheet.create({
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: colors.whiteFaint,
-    borderColor: 'rgba(255, 255, 255, 0.26)',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: theme.radius.full,
     borderWidth: 1,
     height: 74,
@@ -75,22 +75,22 @@ const styles = StyleSheet.create({
     width: 74,
   },
   brand: {
-    color: colors.white,
+    color: colors.textPrimary,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xxl,
     lineHeight: theme.typography.lineHeight.xxl,
     textAlign: 'center',
   },
   subtitle: {
-    color: colors.whiteMuted,
+    color: colors.textSecondary,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.lg,
     lineHeight: theme.typography.lineHeight.lg,
     textAlign: 'center',
   },
   disclaimerPanel: {
-    backgroundColor: 'rgba(7, 31, 49, 0.7)',
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     gap: theme.spacing.md,
@@ -102,20 +102,20 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   panelTitle: {
-    color: colors.white,
+    color: colors.textPrimary,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.lg,
     lineHeight: theme.typography.lineHeight.lg,
   },
   disclaimerText: {
-    color: colors.whiteMuted,
+    color: colors.textSecondary,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.lg,
   },
   acceptButton: {
     alignItems: 'center',
-    backgroundColor: colors.tealDeep,
+    backgroundColor: colors.leafDeep,
     borderRadius: theme.radius.full,
     flexDirection: 'row',
     gap: theme.spacing.sm,

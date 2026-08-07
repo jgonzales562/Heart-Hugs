@@ -83,4 +83,17 @@ describe('PlaybackCoordinator', () => {
     expect(pauseAudio).toHaveBeenCalledTimes(1);
     expect(configureBackgroundAudio.mock.calls).toEqual([[true], [false]]);
   });
+
+  it('finishes without pausing an already-ended player', async () => {
+    const configureBackgroundAudio = jest.fn(async () => true);
+    const coordinator = new PlaybackCoordinator(configureBackgroundAudio);
+    const pauseAudio = jest.fn();
+
+    coordinator.register('audio', { kind: 'audio', pause: pauseAudio });
+    await coordinator.start('audio', jest.fn());
+    await coordinator.finish('audio');
+
+    expect(pauseAudio).not.toHaveBeenCalled();
+    expect(configureBackgroundAudio.mock.calls).toEqual([[true], [false]]);
+  });
 });

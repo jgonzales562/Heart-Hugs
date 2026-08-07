@@ -47,8 +47,8 @@ const styles = StyleSheet.create({
     paddingRight: theme.spacing.lg,
   },
   category: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: theme.radius.full,
     borderWidth: 1,
     elevation: 1,
@@ -56,17 +56,18 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   selectedCategory: {
-    backgroundColor: colors.deepOcean,
-    borderColor: colors.deepOcean,
+    backgroundColor: colors.mintSoft,
+    borderColor: colors.leaf,
     elevation: 4,
   },
   categoryText: {
-    color: colors.whiteMuted,
+    color: colors.textSecondary,
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.sm,
   },
   selectedCategoryText: {
-    color: colors.offWhite,
+    color: colors.leafDeep,
+    fontFamily: theme.typography.fontFamily.semibold,
   },
 });

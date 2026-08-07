@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   largeButton: {
-    backgroundColor: colors.tealDeep,
+    backgroundColor: colors.leafDeep,
     elevation: 6,
     height: 104,
     shadowColor: colors.shadow,

@@ -1,23 +1,43 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronRight, Clock, Headphones, Video } from 'lucide-react-native';
-import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Bookmark, ChevronRight, Clock, Headphones, Video } from 'lucide-react-native';
+import {
+  GestureResponderEvent,
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { colors, theme } from '../theme';
 import { Session } from '../types/session';
 
 type SessionCardProps = {
+  isSaved?: boolean;
   onPress: (session: Session) => void;
+  onToggleSaved?: (session: Session) => void;
   session: Session;
   variant?: 'large' | 'compact' | 'tile';
 };
 
-export function SessionCard({ onPress, session, variant = 'compact' }: SessionCardProps) {
+export function SessionCard({
+  isSaved = false,
+  onPress,
+  onToggleSaved,
+  session,
+  variant = 'compact',
+}: SessionCardProps) {
   const MediaIcon = session.mediaType === 'audio' ? Headphones : Video;
   const isLarge = variant === 'large';
   const isTile = variant === 'tile';
   const highlights = [session.tags[0], session.benefits[0]]
     .filter((highlight): highlight is string => Boolean(highlight))
     .slice(0, 2);
+
+  function toggleSaved(event: GestureResponderEvent) {
+    event.stopPropagation();
+    onToggleSaved?.(session);
+  }
 
   return (
     <Pressable
@@ -36,12 +56,31 @@ export function SessionCard({ onPress, session, variant = 'compact' }: SessionCa
         style={styles.imageBackground}
       >
         <LinearGradient
-          colors={['rgba(6, 30, 48, 0.04)', 'rgba(6, 30, 48, 0.2)', 'rgba(6, 30, 48, 0.88)']}
+          colors={['rgba(24, 59, 66, 0.02)', 'rgba(24, 59, 66, 0.16)', 'rgba(24, 59, 66, 0.86)']}
           locations={[0, 0.42, 1]}
           style={styles.overlay}
         >
           <View style={styles.topRow}>
-            {session.isFeatured ? (
+            {onToggleSaved ? (
+              <Pressable
+                accessibilityLabel={isSaved ? `Remove ${session.title} from Saved` : `Save ${session.title}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSaved }}
+                hitSlop={theme.spacing.xs}
+                onPress={toggleSaved}
+                style={({ pressed }) => [
+                  styles.saveButton,
+                  isSaved && styles.savedButton,
+                  pressed && styles.saveButtonPressed,
+                ]}
+              >
+                <Bookmark
+                  color={isSaved ? colors.navy : colors.white}
+                  fill={isSaved ? colors.white : 'transparent'}
+                  size={17}
+                />
+              </Pressable>
+            ) : session.isFeatured ? (
               <View style={styles.featuredPill}>
                 <Text style={styles.featuredText}>Featured</Text>
               </View>
@@ -106,13 +145,13 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
   },
   compactCard: {
-    height: 196,
+    minHeight: 196,
   },
   largeCard: {
-    height: 310,
+    minHeight: 310,
   },
   tileCard: {
-    height: 268,
+    minHeight: 268,
     width: 218,
   },
   pressed: {
@@ -136,10 +175,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   featuredPill: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.sunshineSoft,
     borderRadius: theme.radius.full,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xxs,
+  },
+  saveButton: {
+    alignItems: 'center',
+    backgroundColor: colors.transparentNavy,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  savedButton: {
+    backgroundColor: colors.leafBright,
+    borderColor: colors.leafBright,
+  },
+  saveButtonPressed: {
+    opacity: 0.76,
+    transform: [{ scale: 0.96 }],
   },
   featuredText: {
     color: colors.navy,

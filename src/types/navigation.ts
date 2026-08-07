@@ -5,12 +5,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type RootStackParamList = {
   MainTabs: undefined;
   Player: { sessionId: string };
+  Settings: undefined;
 };
 
 export type MainTabParamList = {
-  Home: undefined;
-  Library: undefined;
-  About: undefined;
+  Today: undefined;
+  Explore: undefined;
+  Saved: undefined;
 };
 
 export type MainTabScreenProps<T extends keyof MainTabParamList> = CompositeScreenProps<

@@ -1,22 +1,38 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { ArrowLeft, Bookmark, Check, Clock3 } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ArrowLeft, Clock3, X } from 'lucide-react-native';
 
 import { GradientScreen } from '../components/GradientScreen';
 import { MediaPlayer } from '../components/MediaPlayer';
 import { SessionCard } from '../components/SessionCard';
-import { getDefaultSession, getSessionById, sessions } from '../data/sessions';
+import { sessionRepository } from '../content/sessionRepository';
+import { useWellness } from '../state/WellnessProvider';
 import { colors, theme } from '../theme';
 import { RootStackScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
 
 export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player'>) {
-  const [inlineSessionId, setInlineSessionId] = useState<string | null>(null);
-  const [isActivePlayerOpen, setIsActivePlayerOpen] = useState(true);
-  const activeSession = getSessionById(route.params.sessionId) ?? getDefaultSession();
+  const activeSession = sessionRepository.getById(route.params.sessionId) ?? sessionRepository.getDefault();
+  const sessions = sessionRepository.getAll();
+  const {
+    markSessionCompleted,
+    recordOpened,
+    saveProgress,
+    state,
+    toggleSaved,
+  } = useWellness();
+  const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
+  const activity = state.activityBySessionId[activeSession.id];
+  const [resumePosition] = useState(activity?.positionSeconds ?? 0);
+  const isSaved = state.savedSessionIds.includes(activeSession.id);
+  const isCompleted = completedSessionId === activeSession.id;
   const relatedSessions = sessions
-    .filter((session) => session.id !== activeSession.id && session.category === activeSession.category)
+    .filter(
+      (session) =>
+        session.id !== activeSession.id &&
+        session.needIds.some((needId) => activeSession.needIds.includes(needId))
+    )
     .concat(sessions.filter((session) => session.id !== activeSession.id))
     .filter(
       (session, index, allSessions) =>
@@ -24,20 +40,21 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
     )
     .slice(0, 2);
 
-  function openActivePlayer() {
-    setIsActivePlayerOpen(true);
+  useEffect(() => {
+    recordOpened(activeSession.id);
+  }, [activeSession.id, recordOpened]);
+
+  function handleProgress(currentTime: number, duration: number) {
+    saveProgress(activeSession.id, currentTime, duration);
   }
 
-  function closeActivePlayer() {
-    setIsActivePlayerOpen(false);
+  function handleCompletion() {
+    markSessionCompleted(activeSession.id);
+    setCompletedSessionId(activeSession.id);
   }
 
-  function openInlineSession(session: Session) {
-    setInlineSessionId(session.id);
-  }
-
-  function closeInlineSession() {
-    setInlineSessionId(null);
+  function openRelatedSession(session: Session) {
+    navigation.replace('Player', { sessionId: session.id });
   }
 
   return (
@@ -48,18 +65,38 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
         style={styles.hero}
       >
         <LinearGradient
-          colors={['rgba(6, 29, 47, 0.18)', 'rgba(6, 29, 47, 0.82)']}
+          colors={['rgba(6, 29, 47, 0.18)', 'rgba(6, 29, 47, 0.86)']}
           style={styles.heroOverlay}
         >
-          <Pressable
-            accessibilityLabel="Return to the previous screen"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={navigation.goBack}
-            style={({ pressed }) => [styles.backButton, pressed && styles.closeButtonPressed]}
-          >
-            <ArrowLeft color={colors.white} size={22} />
-          </Pressable>
+          <View style={styles.heroActions}>
+            <Pressable
+              accessibilityLabel="Return to the previous screen"
+              accessibilityRole="button"
+              hitSlop={theme.spacing.xs}
+              onPress={navigation.goBack}
+              style={({ pressed }) => [styles.heroButton, pressed && styles.pressed]}
+            >
+              <ArrowLeft color={colors.white} size={22} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel={isSaved ? `Remove ${activeSession.title} from Saved` : `Save ${activeSession.title}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSaved }}
+              hitSlop={theme.spacing.xs}
+              onPress={() => toggleSaved(activeSession.id)}
+              style={({ pressed }) => [
+                styles.heroButton,
+                isSaved && styles.savedButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Bookmark
+                color={isSaved ? colors.navy : colors.white}
+                fill={isSaved ? colors.white : 'transparent'}
+                size={21}
+              />
+            </Pressable>
+          </View>
 
           <View style={styles.heroCopy}>
             <Text style={styles.heroEyebrow}>{activeSession.category}</Text>
@@ -74,88 +111,79 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
         </LinearGradient>
       </ImageBackground>
 
-      {isActivePlayerOpen ? (
-        <View style={styles.activeSession}>
-          <View style={styles.activeHeader}>
-            <View>
-              <Text style={styles.sectionEyebrow}>NOW PLAYING</Text>
-              <Text style={styles.activeTitle}>Your session</Text>
+      <View style={styles.activeSession}>
+        <View>
+          <Text style={styles.sectionEyebrow}>NOW PLAYING</Text>
+          <Text style={styles.sectionTitle}>Your session</Text>
+        </View>
+        <MediaPlayer
+          initialPosition={resumePosition}
+          key={activeSession.id}
+          onComplete={handleCompletion}
+          onProgress={handleProgress}
+          session={activeSession}
+        />
+        {resumePosition > 1 ? (
+          <Text accessibilityLiveRegion="polite" style={styles.resumeNote}>
+            Resumed from your last listening position.
+          </Text>
+        ) : null}
+        {isCompleted ? (
+          <View accessibilityLiveRegion="polite" style={styles.completionPanel}>
+            <View style={styles.completionIcon}>
+              <Check color={colors.navy} size={19} />
             </View>
-            <Pressable
-              accessibilityLabel={`Close ${activeSession.title} player`}
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={closeActivePlayer}
-              style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
-            >
-              <X color={colors.white} size={18} />
-            </Pressable>
+            <View style={styles.completionCopy}>
+              <Text style={styles.completionTitle}>Session complete</Text>
+              <Text style={styles.completionText}>Take a moment to notice how you feel now.</Text>
+            </View>
           </View>
-          <MediaPlayer key={activeSession.id} session={activeSession} />
-          <SessionContext session={activeSession} />
+        ) : null}
+        <SessionContext session={activeSession} />
+      </View>
+
+      {activeSession.transcript ? (
+        <View style={styles.transcriptPanel}>
+          <Text style={styles.sectionEyebrow}>TRANSCRIPT</Text>
+          <Text style={styles.contextText}>{activeSession.transcript}</Text>
         </View>
-      ) : (
-        <View style={styles.activeSession}>
-          <SessionCard onPress={openActivePlayer} session={activeSession} />
-        </View>
-      )}
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionEyebrow}>KEEP EXPLORING</Text>
         <Text style={styles.sectionTitle}>More for this moment</Text>
         <View style={styles.sessionList}>
-          {relatedSessions.map((session) =>
-            session.id === inlineSessionId ? (
-              <View key={session.id} style={styles.inlineSession}>
-                <Pressable
-                  accessibilityLabel={`Close ${session.title} player`}
-                  accessibilityRole="button"
-                  hitSlop={8}
-                  onPress={closeInlineSession}
-                  style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
-                >
-                  <X color={colors.white} size={18} />
-                </Pressable>
-                <SessionContext compact session={session} />
-                <MediaPlayer key={session.id} session={session} />
-              </View>
-            ) : (
-              <SessionCard key={session.id} onPress={openInlineSession} session={session} />
-            )
-          )}
+          {relatedSessions.map((session) => (
+            <SessionCard
+              isSaved={state.savedSessionIds.includes(session.id)}
+              key={session.id}
+              onPress={openRelatedSession}
+              onToggleSaved={(selectedSession) => toggleSaved(selectedSession.id)}
+              session={session}
+            />
+          ))}
         </View>
       </View>
     </GradientScreen>
   );
 }
 
-type SessionContextProps = {
-  compact?: boolean;
-  session: Session;
-};
-
-function SessionContext({ compact = false, session }: SessionContextProps) {
-  const mediaLabel = session.mediaType === 'audio' ? 'Audio' : 'Video';
-  const benefits = session.benefits.slice(0, compact ? 1 : 2);
-  const tags = session.tags.slice(0, compact ? 2 : 3);
-
+function SessionContext({ session }: { session: Session }) {
   return (
-    <View style={[styles.sessionContext, compact && styles.compactSessionContext]}>
+    <View style={styles.sessionContext}>
       <View style={styles.contextMetaRow}>
-        <Text style={styles.contextMeta}>{session.durationMinutes} min</Text>
+        <Text style={styles.contextMeta}>{session.mediaType === 'audio' ? 'Audio' : 'Video'}</Text>
         <Text style={styles.contextDivider}>/</Text>
-        <Text style={styles.contextMeta}>{session.difficulty}</Text>
-        <Text style={styles.contextDivider}>/</Text>
-        <Text style={styles.contextMeta}>{mediaLabel}</Text>
+        <Text style={styles.contextMeta}>By {session.authorName}</Text>
       </View>
 
       <View style={styles.contextBlock}>
-        <Text style={styles.contextLabel}>Benefits</Text>
-        <Text style={styles.contextText}>{benefits.join(', ')}</Text>
+        <Text style={styles.contextLabel}>May help you</Text>
+        <Text style={styles.contextText}>{session.benefits.join(', ')}</Text>
       </View>
 
       <View style={styles.tagList}>
-        {tags.map((tag) => (
+        {session.tags.map((tag) => (
           <View key={tag} style={styles.tagPill}>
             <Text style={styles.tagText}>{tag}</Text>
           </View>
@@ -171,8 +199,8 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.sm,
   },
   hero: {
-    height: 286,
     marginBottom: theme.spacing.xl,
+    minHeight: 286,
   },
   heroImage: {
     borderRadius: 34,
@@ -181,18 +209,31 @@ const styles = StyleSheet.create({
     borderRadius: 34,
     flex: 1,
     justifyContent: 'space-between',
+    minHeight: 286,
     overflow: 'hidden',
     padding: theme.spacing.lg,
   },
-  backButton: {
+  heroActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  heroButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(8, 37, 56, 0.38)',
+    backgroundColor: 'rgba(8, 37, 56, 0.46)',
     borderColor: 'rgba(255, 255, 255, 0.26)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
     height: 44,
     justifyContent: 'center',
     width: 44,
+  },
+  savedButton: {
+    backgroundColor: colors.leafBright,
+    borderColor: colors.leafBright,
+  },
+  pressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.96 }],
   },
   heroCopy: {
     gap: theme.spacing.xs,
@@ -215,6 +256,7 @@ const styles = StyleSheet.create({
   heroMetaRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.spacing.xs,
     paddingTop: theme.spacing.xs,
   },
@@ -226,7 +268,9 @@ const styles = StyleSheet.create({
   },
   heroMetaDivider: {
     color: colors.whiteMuted,
-    fontSize: theme.typography.size.sm,
+  },
+  activeSession: {
+    gap: theme.spacing.md,
   },
   section: {
     gap: theme.spacing.md,
@@ -234,65 +278,72 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xl,
   },
   sectionTitle: {
-    color: colors.white,
+    color: colors.textPrimary,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xl,
     lineHeight: theme.typography.lineHeight.xl,
   },
   sectionEyebrow: {
-    color: colors.teal,
+    color: colors.leafDeep,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xs,
     letterSpacing: 1.5,
     lineHeight: theme.typography.lineHeight.sm,
   },
-  sessionList: {
-    gap: theme.spacing.md,
+  resumeNote: {
+    color: colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: theme.typography.size.xs,
+    textAlign: 'center',
   },
-  activeSession: {
-    gap: theme.spacing.md,
-  },
-  activeHeader: {
+  completionPanel: {
     alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  activeTitle: {
-    color: colors.white,
-    fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: theme.typography.size.xl,
-    lineHeight: theme.typography.lineHeight.xl,
-  },
-  inlineSession: {
-    gap: theme.spacing.md,
-  },
-  closeButton: {
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: theme.radius.full,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  closeButtonPressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.96 }],
-  },
-  sessionContext: {
-    backgroundColor: 'rgba(7, 31, 49, 0.64)',
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: colors.mintSoft,
+    borderColor: colors.leaf,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    elevation: 2,
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  completionIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.sunshine,
+    borderRadius: theme.radius.full,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  completionCopy: {
+    flex: 1,
+    gap: theme.spacing.xxs,
+  },
+  completionTitle: {
+    color: colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.md,
+  },
+  completionText: {
+    color: colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: theme.typography.size.sm,
+  },
+  sessionContext: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
     gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
     padding: theme.spacing.md,
   },
-  compactSessionContext: {
-    marginBottom: 0,
+  transcriptPanel: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.spacing.sm,
+    padding: theme.spacing.lg,
   },
   contextMetaRow: {
     alignItems: 'center',
@@ -301,27 +352,26 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   contextMeta: {
-    color: colors.teal,
+    color: colors.leafDeep,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.sm,
   },
   contextDivider: {
-    color: colors.whiteMuted,
-    fontSize: theme.typography.size.sm,
+    color: colors.textSecondary,
   },
   contextBlock: {
     gap: theme.spacing.xxs,
   },
   contextLabel: {
-    color: colors.white,
+    color: colors.textPrimary,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xs,
     lineHeight: theme.typography.lineHeight.sm,
     textTransform: 'uppercase',
   },
   contextText: {
-    color: colors.whiteMuted,
+    color: colors.textSecondary,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.md,
@@ -332,18 +382,21 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   tagPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
     borderRadius: theme.radius.full,
     borderWidth: 1,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 6,
   },
   tagText: {
-    color: colors.whiteMuted,
+    color: colors.textSecondary,
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.xs,
     lineHeight: theme.typography.lineHeight.sm,
     textTransform: 'capitalize',
+  },
+  sessionList: {
+    gap: theme.spacing.md,
   },
 });

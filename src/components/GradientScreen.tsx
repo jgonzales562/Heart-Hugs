@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     top: 0,
   },
   aquaBloom: {
-    backgroundColor: 'rgba(73, 190, 176, 0.3)',
+    backgroundColor: 'rgba(103, 185, 120, 0.28)',
     borderRadius: theme.radius.full,
     height: 280,
     position: 'absolute',
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     width: 280,
   },
   lavenderBloom: {
-    backgroundColor: 'rgba(137, 105, 190, 0.32)',
+    backgroundColor: 'rgba(145, 212, 119, 0.24)',
     borderRadius: theme.radius.full,
     height: 230,
     left: -126,
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     width: 230,
   },
   flowBand: {
-    backgroundColor: 'rgba(229, 138, 120, 0.22)',
+    backgroundColor: 'rgba(245, 200, 93, 0.2)',
     borderRadius: theme.radius.full,
     height: 124,
     left: -96,
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-12deg' }],
   },
   largeRing: {
-    borderColor: 'rgba(117, 199, 193, 0.28)',
+    borderColor: 'rgba(47, 116, 80, 0.24)',
     borderRadius: theme.radius.full,
     borderWidth: 2,
     height: 330,
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     width: 330,
   },
   smallRing: {
-    borderColor: 'rgba(255, 255, 255, 0.48)',
+    borderColor: 'rgba(242, 124, 109, 0.26)',
     borderRadius: theme.radius.full,
     borderWidth: 2,
     height: 116,

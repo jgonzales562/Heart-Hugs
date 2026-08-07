@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     height: 5,
   },
   fill: {
-    backgroundColor: colors.tealDeep,
+    backgroundColor: colors.leafDeep,
     borderRadius: theme.radius.full,
     height: '100%',
   },

@@ -3,20 +3,23 @@ import { NavigationContainer, DefaultTheme as NavigationDefaultTheme } from '@re
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { BookOpen, Heart, Home, Info } from 'lucide-react-native';
+import { Bookmark, Compass, Heart } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';
 
 import { GradientScreen } from './src/components/GradientScreen';
+import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { WELLNESS_DISCLAIMER_VERSION } from './src/constants/disclaimer';
 import { DISCLAIMER_ACCEPTANCE_KEY } from './src/constants/storage';
-import { AboutScreen } from './src/screens/AboutScreen';
-import { HomeScreen } from './src/screens/HomeScreen';
-import { LibraryScreen } from './src/screens/LibraryScreen';
+import { SettingsScreen } from './src/screens/AboutScreen';
+import { TodayScreen } from './src/screens/HomeScreen';
+import { ExploreScreen } from './src/screens/LibraryScreen';
 import { PlayerScreen } from './src/screens/PlayerScreen';
+import { SavedScreen } from './src/screens/SavedScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
+import { WellnessProvider, useWellness } from './src/state/WellnessProvider';
 import { colors, theme } from './src/theme';
 import { MainTabParamList, RootStackParamList } from './src/types/navigation';
 import {
@@ -35,11 +38,11 @@ const navigationTheme = {
   ...NavigationDefaultTheme,
   colors: {
     ...NavigationDefaultTheme.colors,
-    background: colors.deepOcean,
-    border: 'rgba(255, 255, 255, 0.12)',
-    card: colors.deepOcean,
-    primary: colors.teal,
-    text: colors.offWhite,
+    background: colors.canvas,
+    border: colors.border,
+    card: colors.surface,
+    primary: colors.leafDeep,
+    text: colors.textPrimary,
   },
 };
 
@@ -48,9 +51,9 @@ function AppTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.white,
-        tabBarActiveBackgroundColor: colors.ocean,
-        tabBarInactiveTintColor: colors.whiteMuted,
+        tabBarActiveTintColor: colors.leafDeep,
+        tabBarActiveBackgroundColor: colors.mintSoft,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarHideOnKeyboard: true,
         tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
@@ -58,29 +61,29 @@ function AppTabs() {
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
+        name="Today"
+        component={TodayScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Home color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
+            <Heart color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
           ),
         }}
       />
       <Tab.Screen
-        name="Library"
-        component={LibraryScreen}
+        name="Explore"
+        component={ExploreScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <BookOpen color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
+            <Compass color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
           ),
         }}
       />
       <Tab.Screen
-        name="About"
-        component={AboutScreen}
+        name="Saved"
+        component={SavedScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <Info color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
+            <Bookmark color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
           ),
         }}
       />
@@ -93,7 +96,26 @@ function RootNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={AppTabs} />
       <Stack.Screen name="Player" component={PlayerScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
+  );
+}
+
+function MainExperience() {
+  const { isHydrated } = useWellness();
+
+  if (!isHydrated) {
+    return (
+      <GradientScreen contentContainerStyle={styles.loadingScreen} includeBottomSafeArea>
+        <ActivityIndicator color={colors.leafDeep} />
+      </GradientScreen>
+    );
+  }
+
+  return (
+    <NavigationContainer theme={navigationTheme}>
+      <RootNavigator />
+    </NavigationContainer>
   );
 }
 
@@ -168,34 +190,36 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
-      {hasAcceptedDisclaimer === null ? (
-        <GradientScreen contentContainerStyle={styles.loadingScreen} includeBottomSafeArea>
-          <View style={styles.brandMark}>
-            <Heart color={colors.rose} fill={colors.roseSoft} size={28} />
-          </View>
-          <ActivityIndicator color={colors.teal} />
-        </GradientScreen>
-      ) : hasAcceptedDisclaimer ? (
-        <NavigationContainer theme={navigationTheme}>
-          <RootNavigator />
-        </NavigationContainer>
-      ) : (
-        <WelcomeScreen
-          errorMessage={disclaimerError}
-          isAccepting={isAcceptingDisclaimer}
-          onAccept={acceptDisclaimer}
-        />
-      )}
-    </SafeAreaProvider>
+    <AppErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        {hasAcceptedDisclaimer === null ? (
+          <GradientScreen contentContainerStyle={styles.loadingScreen} includeBottomSafeArea>
+            <View style={styles.brandMark}>
+              <Heart color={colors.rose} fill={colors.roseSoft} size={28} />
+            </View>
+            <ActivityIndicator color={colors.leafDeep} />
+          </GradientScreen>
+        ) : hasAcceptedDisclaimer ? (
+          <WellnessProvider>
+            <MainExperience />
+          </WellnessProvider>
+        ) : (
+          <WelcomeScreen
+            errorMessage={disclaimerError}
+            isAccepting={isAcceptingDisclaimer}
+            onAccept={acceptDisclaimer}
+          />
+        )}
+      </SafeAreaProvider>
+    </AppErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.deepOcean,
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: colors.surface,
+    borderTopColor: colors.border,
     height: 82,
     paddingBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.sm,
