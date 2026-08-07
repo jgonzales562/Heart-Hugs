@@ -57,15 +57,15 @@ export function SavedScreen({ navigation }: MainTabScreenProps<'Saved'>) {
           </View>
           <Text style={styles.emptyTitle}>Your saved practices will appear here</Text>
           <Text style={styles.emptyText}>
-            Save a session from Explore or the player so it is easy to return to.
+            Save a session from Today or the player so it is easy to return to.
           </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => navigation.navigate('Explore')}
-            style={({ pressed }) => [styles.exploreButton, pressed && styles.pressed]}
+            onPress={() => navigation.navigate('Today')}
+            style={({ pressed }) => [styles.browseButton, pressed && styles.pressed]}
           >
             <Compass color={colors.navy} size={18} />
-            <Text style={styles.exploreButtonText}>Explore practices</Text>
+            <Text style={styles.browseButtonText}>Browse practices</Text>
           </Pressable>
         </View>
       ) : (
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     lineHeight: theme.typography.lineHeight.md,
     textAlign: 'center',
   },
-  exploreButton: {
+  browseButton: {
     alignItems: 'center',
     backgroundColor: colors.sunshine,
     borderRadius: theme.radius.full,
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
   },
-  exploreButtonText: {
+  browseButtonText: {
     color: colors.navy,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.sm,

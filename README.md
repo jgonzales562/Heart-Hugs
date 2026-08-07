@@ -15,7 +15,7 @@ Native development uses the EAS development profiles in `eas.json`. The app curr
 ## Product structure
 
 - **Today** recommends a session from a selected need and time preference and surfaces resumable activity.
-- **Explore** supports text search and category filtering.
+- **Today** combines a guided recommendation with a simple list of every practice.
 - **Saved** contains local bookmarks, recent activity, and completion totals.
 - **Player** owns one mounted media session at a time, restores position, supports seeking and playback speed for audio, and records completion.
 - **Settings** contains practitioner information, the complete wellness disclaimer, safety information, privacy behavior, and content status.

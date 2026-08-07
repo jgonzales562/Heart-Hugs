@@ -190,6 +190,24 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
         </View>
       ) : null}
 
+      <View style={styles.section}>
+        <Text style={styles.sectionEyebrow}>MORE PRACTICES</Text>
+        <Text style={styles.sectionTitle}>Browse at your own pace</Text>
+        <View style={styles.sessionList}>
+          {sessions
+            .filter((session) => session.id !== recommendedSession.id)
+            .map((session) => (
+              <SessionCard
+                isSaved={state.savedSessionIds.includes(session.id)}
+                key={session.id}
+                onPress={openSession}
+                onToggleSaved={(selectedSession) => toggleSaved(selectedSession.id)}
+                session={session}
+              />
+            ))}
+        </View>
+      </View>
+
       <Text style={styles.catalogNote}>{sessions.length} supportive practices available</Text>
     </GradientScreen>
   );
@@ -403,6 +421,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.xs,
+  },
+  sessionList: {
+    gap: theme.spacing.md,
   },
   catalogNote: {
     color: colors.textSecondary,
