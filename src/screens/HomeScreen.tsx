@@ -1,7 +1,8 @@
 import { Settings, Sparkles } from 'lucide-react-native';
 import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
 import { PlaybackProgress } from '../components/PlaybackProgress';
 import { SessionCard } from '../components/SessionCard';
@@ -64,17 +65,17 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
       <View style={styles.topBar}>
         <View style={styles.brandCopy}>
           <Text style={styles.eyebrow}>HEART HUGS</Text>
-          <Text style={styles.title}>What would help right now?</Text>
+          <Text style={styles.title}>Come back to yourself.</Text>
         </View>
-        <Pressable
+        <BreathingPressable
           accessibilityLabel="Open settings and safety information"
           accessibilityRole="button"
           hitSlop={theme.spacing.xs}
           onPress={() => navigation.navigate('Settings')}
-          style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}
+          style={styles.settingsButton}
         >
           <Settings color={colors.textPrimary} size={21} />
-        </Pressable>
+        </BreathingPressable>
       </View>
 
       {continueSession ? (
@@ -101,21 +102,20 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
             const isSelected = need.id === state.needPreference;
 
             return (
-              <Pressable
+              <BreathingPressable
                 accessibilityRole="radio"
                 accessibilityState={{ checked: isSelected }}
                 key={need.id}
                 onPress={() => setNeedPreference(need.id)}
-                style={({ pressed }) => [
+                style={[
                   styles.needButton,
                   isSelected && styles.selectedNeedButton,
-                  pressed && styles.pressed,
                 ]}
               >
                 <Text style={[styles.needLabel, isSelected && styles.selectedNeedLabel]}>
                   {need.label}
                 </Text>
-              </Pressable>
+              </BreathingPressable>
             );
           })}
         </View>
@@ -131,15 +131,14 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
             const isSelected = duration === state.durationPreference;
 
             return (
-              <Pressable
+              <BreathingPressable
                 accessibilityRole="radio"
                 accessibilityState={{ checked: isSelected }}
                 key={duration ?? 'any'}
                 onPress={() => setDurationPreference(duration)}
-                style={({ pressed }) => [
+                style={[
                   styles.durationButton,
                   isSelected && styles.selectedDurationButton,
-                  pressed && styles.pressed,
                 ]}
               >
                 <Text
@@ -147,7 +146,7 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
                 >
                   {renderDurationLabel(duration)}
                 </Text>
-              </Pressable>
+              </BreathingPressable>
             );
           })}
         </View>
@@ -225,11 +224,11 @@ function ContinueCard({ activity, onPress, session }: ContinueCardProps) {
     : 0;
 
   return (
-    <Pressable
+    <BreathingPressable
       accessibilityLabel={`Continue ${session.title}`}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.continueCard, pressed && styles.pressed]}
+      style={styles.continueCard}
     >
       <Text style={[styles.sectionEyebrow, styles.continueEyebrow]}>CONTINUE LISTENING</Text>
       <Text style={styles.continueTitle}>{session.title}</Text>
@@ -239,7 +238,7 @@ function ContinueCard({ activity, onPress, session }: ContinueCardProps) {
         progress={progress}
         tone="overlay"
       />
-    </Pressable>
+    </BreathingPressable>
   );
 }
 
@@ -269,9 +268,9 @@ const styles = StyleSheet.create({
   title: {
     color: colors.textPrimary,
     fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: 38,
+    fontSize: 40,
     letterSpacing: -1,
-    lineHeight: 44,
+    lineHeight: 45,
   },
   settingsButton: {
     alignItems: 'center',
@@ -283,13 +282,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 46,
   },
-  pressed: {
-    opacity: 0.78,
-    transform: [{ scale: 0.98 }],
-  },
   continueCard: {
-    backgroundColor: colors.leafDeep,
-    borderColor: colors.leaf,
+    backgroundColor: colors.magentaDeep,
+    borderColor: colors.hotPink,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     elevation: 4,
@@ -354,8 +349,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
   },
   selectedNeedButton: {
-    backgroundColor: colors.mintSoft,
-    borderColor: colors.leaf,
+    backgroundColor: colors.lavender,
+    borderColor: colors.magenta,
   },
   needLabel: {
     color: colors.textPrimary,
@@ -390,8 +385,8 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
   },
   selectedDurationButton: {
-    backgroundColor: colors.leafDeep,
-    borderColor: colors.leafDeep,
+    backgroundColor: colors.violetDeep,
+    borderColor: colors.violetDeep,
   },
   durationText: {
     color: colors.textSecondary,

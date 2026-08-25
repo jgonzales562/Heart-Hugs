@@ -1,6 +1,7 @@
 import { ArrowLeft, BadgeCheck, HeartHandshake, Info, ShieldCheck } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
 import { WELLNESS_DISCLAIMER, WELLNESS_DISCLAIMER_VERSION } from '../constants/disclaimer';
 import { therapistProfile } from '../data/therapist';
@@ -11,15 +12,15 @@ export function SettingsScreen({ navigation }: RootStackScreenProps<'Settings'>)
   return (
     <GradientScreen contentContainerStyle={styles.screen} includeBottomSafeArea scroll>
       <View style={styles.topBar}>
-        <Pressable
+        <BreathingPressable
           accessibilityLabel="Return to the previous screen"
           accessibilityRole="button"
           hitSlop={theme.spacing.xs}
           onPress={navigation.goBack}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          style={styles.backButton}
         >
           <ArrowLeft color={colors.textPrimary} size={22} />
-        </Pressable>
+        </BreathingPressable>
         <Text style={styles.topBarTitle}>Settings</Text>
       </View>
 
@@ -101,10 +102,6 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     width: 44,
-  },
-  pressed: {
-    opacity: 0.76,
-    transform: [{ scale: 0.97 }],
   },
   topBarTitle: {
     color: colors.textPrimary,

@@ -5,8 +5,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer, type VideoPlayerStatus } from 'expo-video';
 import { AlertCircle, FastForward, Rewind, RotateCcw } from 'lucide-react-native';
 import { ReactNode, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 
+import { BreathingPressable } from './BreathingPressable';
 import {
   PlaybackProgress,
   getPlaybackProgress,
@@ -583,16 +584,16 @@ function PlaybackStatusMessage({
       )}
       <Text style={styles.statusMessageText}>{visibleError ?? loadingMessage}</Text>
       {visibleError ? (
-        <Pressable
+        <BreathingPressable
           accessibilityLabel="Retry loading this session"
           accessibilityRole="button"
           hitSlop={theme.spacing.xs}
           onPress={onRetry}
-          style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}
+          style={styles.retryButton}
         >
           <RotateCcw color={colors.leafDeep} size={15} />
           <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
+        </BreathingPressable>
       ) : null}
     </View>
   );
@@ -645,33 +646,32 @@ function TransportButton({
   }
 
   return (
-    <Pressable
+    <BreathingPressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={handlePress}
-      style={({ pressed }) => [
+      style={[
         styles.transportButton,
         disabled && styles.transportButtonDisabled,
-        pressed && styles.transportButtonPressed,
       ]}
     >
       {children}
-    </Pressable>
+    </BreathingPressable>
   );
 }
 
 function PlaybackRateButton({ onPress, rate }: { onPress: () => void; rate: number }) {
   return (
-    <Pressable
+    <BreathingPressable
       accessibilityLabel={`Playback speed ${rate} times. Change playback speed.`}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.rateButton, pressed && styles.transportButtonPressed]}
+      style={styles.rateButton}
     >
       <Text style={styles.rateButtonText}>{rate}×</Text>
-    </Pressable>
+    </BreathingPressable>
   );
 }
 
@@ -718,9 +718,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
   },
-  retryButtonPressed: {
-    opacity: 0.72,
-  },
   retryButtonText: {
     color: colors.leafDeep,
     fontFamily: theme.typography.fontFamily.semibold,
@@ -755,10 +752,6 @@ const styles = StyleSheet.create({
   },
   transportButtonDisabled: {
     opacity: 0.45,
-  },
-  transportButtonPressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.96 }],
   },
   rateButton: {
     alignItems: 'center',

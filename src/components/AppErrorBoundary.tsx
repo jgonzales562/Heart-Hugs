@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { BreathingPressable } from './BreathingPressable';
 import { GradientScreen } from './GradientScreen';
 import { colors, theme } from '../theme';
 
@@ -39,13 +40,13 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
           <Text style={styles.body}>
             Something unexpected happened. Your saved practices and progress remain on this device.
           </Text>
-          <Pressable
+          <BreathingPressable
             accessibilityRole="button"
             onPress={this.retry}
-            style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+            style={styles.button}
           >
             <Text style={styles.buttonText}>Try again</Text>
-          </Pressable>
+          </BreathingPressable>
         </View>
       </GradientScreen>
     );
@@ -87,9 +88,6 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
-  },
-  pressed: {
-    opacity: 0.76,
   },
   buttonText: {
     color: colors.navy,

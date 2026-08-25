@@ -1,7 +1,8 @@
 import { Pause, Play } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
+import { BreathingPressable } from './BreathingPressable';
 import { colors, theme } from '../theme';
 
 type PlaybackToggleProps = {
@@ -50,7 +51,7 @@ export function PlaybackToggle({
   }
 
   return (
-    <Pressable
+    <BreathingPressable
       accessibilityLabel={accessibilityLabel}
       accessibilityHint="Toggles playback for this session."
       accessibilityRole="button"
@@ -58,11 +59,10 @@ export function PlaybackToggle({
       disabled={disabled || isPending}
       hitSlop={isLarge ? 0 : theme.spacing.xs}
       onPress={handlePress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         isLarge ? styles.largeButton : styles.compactButton,
         (disabled || isPending) && styles.disabled,
-        pressed && styles.pressed,
       ]}
     >
       {isPending ? (
@@ -72,7 +72,7 @@ export function PlaybackToggle({
       ) : (
         <Play color={colors.offWhite} fill={colors.offWhite} size={iconSize} />
       )}
-    </Pressable>
+    </BreathingPressable>
   );
 }
 
@@ -99,10 +99,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.transparentNavy,
     height: 44,
     width: 44,
-  },
-  pressed: {
-    opacity: 0.86,
-    transform: [{ scale: 0.98 }],
   },
   disabled: {
     opacity: 0.56,

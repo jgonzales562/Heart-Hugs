@@ -1,8 +1,11 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { AlertCircle, Heart, ShieldCheck } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ImageBackground, StyleSheet, Text, View } from 'react-native';
 
+import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
 import { WELLNESS_DISCLAIMER } from '../constants/disclaimer';
+import { welcomeArtwork } from '../data/sessionArtwork';
 import { colors, gradients, theme } from '../theme';
 
 type WelcomeScreenProps = {
@@ -14,13 +17,21 @@ type WelcomeScreenProps = {
 export function WelcomeScreen({ errorMessage, isAccepting, onAccept }: WelcomeScreenProps) {
   return (
     <GradientScreen gradientColors={gradients.welcome} includeBottomSafeArea scroll>
-      <View style={styles.hero}>
-        <View style={styles.brandMark}>
-          <Heart color={colors.rose} fill={colors.roseSoft} size={32} />
-        </View>
-        <Text style={styles.brand}>Heart Hugs</Text>
-        <Text style={styles.subtitle}>Gentle guided care for softer moments.</Text>
-      </View>
+      <ImageBackground imageStyle={styles.heroImage} source={welcomeArtwork} style={styles.hero}>
+        <LinearGradient
+          colors={['rgba(27, 16, 55, 0.06)', 'rgba(27, 16, 55, 0.88)']}
+          style={styles.heroOverlay}
+        >
+          <View style={styles.brandMark}>
+            <Heart color={colors.hotPink} fill={colors.hotPink} size={28} />
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>A SOFTER PLACE TO LAND</Text>
+            <Text style={styles.brand}>Heart Hugs</Text>
+            <Text style={styles.subtitle}>Small practices. Vivid moments of care.</Text>
+          </View>
+        </LinearGradient>
+      </ImageBackground>
 
       <View style={styles.disclaimerPanel}>
         <View style={styles.panelHeader}>
@@ -37,56 +48,70 @@ export function WelcomeScreen({ errorMessage, isAccepting, onAccept }: WelcomeSc
         </View>
       ) : null}
 
-      <Pressable
+      <BreathingPressable
         accessibilityRole="button"
         accessibilityState={{ busy: isAccepting, disabled: isAccepting }}
         disabled={isAccepting}
         onPress={onAccept}
-        style={({ pressed }) => [
+        style={[
           styles.acceptButton,
           isAccepting && styles.acceptButtonDisabled,
-          pressed && styles.pressed,
         ]}
       >
         {isAccepting ? <ActivityIndicator color={colors.offWhite} size="small" /> : null}
         <Text style={styles.acceptText}>
           {isAccepting ? 'Saving acceptance…' : 'I understand and agree'}
         </Text>
-      </Pressable>
+      </BreathingPressable>
     </GradientScreen>
   );
 }
 
 const styles = StyleSheet.create({
   hero: {
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    paddingBottom: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl,
+    height: 440,
+  },
+  heroImage: {
+    borderRadius: 36,
+  },
+  heroOverlay: {
+    borderRadius: 36,
+    height: 440,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    padding: theme.spacing.lg,
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    backgroundColor: 'rgba(255, 252, 247, 0.9)',
+    borderColor: 'rgba(255, 255, 255, 0.54)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
-    height: 74,
+    height: 56,
     justifyContent: 'center',
-    width: 74,
+    width: 56,
+  },
+  heroCopy: {
+    gap: theme.spacing.xs,
+  },
+  heroEyebrow: {
+    color: colors.sunshine,
+    fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.xs,
+    letterSpacing: 1.7,
   },
   brand: {
-    color: colors.textPrimary,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: theme.typography.size.xxl,
-    lineHeight: theme.typography.lineHeight.xxl,
-    textAlign: 'center',
+    fontSize: 42,
+    letterSpacing: -1.2,
+    lineHeight: 48,
   },
   subtitle: {
-    color: colors.textSecondary,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.lg,
     lineHeight: theme.typography.lineHeight.lg,
-    textAlign: 'center',
   },
   disclaimerPanel: {
     backgroundColor: colors.surface,
@@ -115,7 +140,7 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     alignItems: 'center',
-    backgroundColor: colors.leafDeep,
+    backgroundColor: colors.violetDeep,
     borderRadius: theme.radius.full,
     flexDirection: 'row',
     gap: theme.spacing.sm,
@@ -123,9 +148,6 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xl,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-  },
-  pressed: {
-    opacity: 0.88,
   },
   acceptButtonDisabled: {
     opacity: 0.72,

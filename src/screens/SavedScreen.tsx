@@ -1,6 +1,7 @@
 import { Bookmark, Compass, Settings } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
 import { SessionCard } from '../components/SessionCard';
 import { sessionRepository } from '../content/sessionRepository';
@@ -35,14 +36,14 @@ export function SavedScreen({ navigation }: MainTabScreenProps<'Saved'>) {
           <Text style={styles.eyebrow}>YOUR SPACE</Text>
           <Text style={styles.title}>Saved for when you need it</Text>
         </View>
-        <Pressable
+        <BreathingPressable
           accessibilityLabel="Open settings and safety information"
           accessibilityRole="button"
           onPress={() => navigation.navigate('Settings')}
-          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+          style={styles.iconButton}
         >
           <Settings color={colors.textPrimary} size={21} />
-        </Pressable>
+        </BreathingPressable>
       </View>
 
       <View style={styles.summaryRow}>
@@ -59,14 +60,14 @@ export function SavedScreen({ navigation }: MainTabScreenProps<'Saved'>) {
           <Text style={styles.emptyText}>
             Save a session from Today or the player so it is easy to return to.
           </Text>
-          <Pressable
+          <BreathingPressable
             accessibilityRole="button"
             onPress={() => navigation.navigate('Today')}
-            style={({ pressed }) => [styles.browseButton, pressed && styles.pressed]}
+            style={styles.browseButton}
           >
             <Compass color={colors.navy} size={18} />
             <Text style={styles.browseButtonText}>Browse practices</Text>
-          </Pressable>
+          </BreathingPressable>
         </View>
       ) : (
         <View style={styles.section}>
@@ -153,10 +154,6 @@ const styles = StyleSheet.create({
     height: 46,
     justifyContent: 'center',
     width: 46,
-  },
-  pressed: {
-    opacity: 0.78,
-    transform: [{ scale: 0.98 }],
   },
   summaryRow: {
     flexDirection: 'row',

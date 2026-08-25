@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 import {
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -9,6 +8,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 
+import { BreathingPressable } from './BreathingPressable';
 import { colors, theme } from '../theme';
 import { formatPlaybackTime } from '../utils/time';
 
@@ -115,7 +115,7 @@ export function PlaybackProgress({
           {formatPlaybackTime(safeDuration)}
         </Text>
       </View>
-      <Pressable
+      <BreathingPressable
         accessibilityActions={
           isSeekEnabled
             ? [
@@ -142,7 +142,10 @@ export function PlaybackProgress({
         onAccessibilityAction={handleAccessibilityAction}
         onLayout={handleTrackLayout}
         onPress={handleTrackPress}
-        style={[styles.track, isOverlay && styles.overlayTrack]}
+        style={[
+          styles.track,
+          isOverlay && styles.overlayTrack,
+        ]}
       >
         <View
           style={[
@@ -151,7 +154,7 @@ export function PlaybackProgress({
             { width: `${clampedProgress * 100}%` },
           ]}
         />
-      </Pressable>
+      </BreathingPressable>
     </View>
   );
 }

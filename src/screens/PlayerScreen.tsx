@@ -1,12 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Bookmark, Check, Clock3 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, StyleSheet, Text, View } from 'react-native';
 
+import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
 import { MediaPlayer } from '../components/MediaPlayer';
 import { SessionCard } from '../components/SessionCard';
 import { sessionRepository } from '../content/sessionRepository';
+import { getSessionArtwork } from '../data/sessionArtwork';
 import { useWellness } from '../state/WellnessProvider';
 import { colors, theme } from '../theme';
 import { RootStackScreenProps } from '../types/navigation';
@@ -61,33 +63,32 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
     <GradientScreen contentContainerStyle={styles.screen} includeBottomSafeArea scroll>
       <ImageBackground
         imageStyle={styles.heroImage}
-        source={{ uri: activeSession.thumbnailUrl }}
+        source={getSessionArtwork(activeSession)}
         style={styles.hero}
       >
         <LinearGradient
-          colors={['rgba(6, 29, 47, 0.18)', 'rgba(6, 29, 47, 0.86)']}
+          colors={['rgba(27, 16, 55, 0.08)', 'rgba(27, 16, 55, 0.9)']}
           style={styles.heroOverlay}
         >
           <View style={styles.heroActions}>
-            <Pressable
+            <BreathingPressable
               accessibilityLabel="Return to the previous screen"
               accessibilityRole="button"
               hitSlop={theme.spacing.xs}
               onPress={navigation.goBack}
-              style={({ pressed }) => [styles.heroButton, pressed && styles.pressed]}
+              style={styles.heroButton}
             >
               <ArrowLeft color={colors.white} size={22} />
-            </Pressable>
-            <Pressable
+            </BreathingPressable>
+            <BreathingPressable
               accessibilityLabel={isSaved ? `Remove ${activeSession.title} from Saved` : `Save ${activeSession.title}`}
               accessibilityRole="button"
               accessibilityState={{ selected: isSaved }}
               hitSlop={theme.spacing.xs}
               onPress={() => toggleSaved(activeSession.id)}
-              style={({ pressed }) => [
+              style={[
                 styles.heroButton,
                 isSaved && styles.savedButton,
-                pressed && styles.pressed,
               ]}
             >
               <Bookmark
@@ -95,7 +96,7 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
                 fill={isSaved ? colors.white : 'transparent'}
                 size={21}
               />
-            </Pressable>
+            </BreathingPressable>
           </View>
 
           <View style={styles.heroCopy}>
@@ -230,10 +231,6 @@ const styles = StyleSheet.create({
   savedButton: {
     backgroundColor: colors.leafBright,
     borderColor: colors.leafBright,
-  },
-  pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.96 }],
   },
   heroCopy: {
     gap: theme.spacing.xs,

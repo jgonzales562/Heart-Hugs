@@ -11,6 +11,7 @@ import { enableScreens } from 'react-native-screens';
 
 import { GradientScreen } from './src/components/GradientScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+import { BreathingPressable } from './src/components/BreathingPressable';
 import { WELLNESS_DISCLAIMER_VERSION } from './src/constants/disclaimer';
 import { DISCLAIMER_ACCEPTANCE_KEY } from './src/constants/storage';
 import { SettingsScreen } from './src/screens/AboutScreen';
@@ -50,10 +51,17 @@ function AppTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.leafDeep,
-        tabBarActiveBackgroundColor: colors.mintSoft,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarActiveTintColor: colors.sunshine,
+        tabBarActiveBackgroundColor: 'rgba(255, 79, 135, 0.2)',
+        tabBarInactiveTintColor: colors.lavender,
         tabBarHideOnKeyboard: true,
+        tabBarButton: ({ ref: _ref, ...props }) => (
+          <BreathingPressable
+            {...props}
+            containerStyle={props.style}
+            style={styles.tabBarPressable}
+          />
+        ),
         tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
         tabBarStyle: styles.tabBar,
@@ -208,20 +216,30 @@ export default function App() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-    height: 82,
+    backgroundColor: colors.midnight,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 28,
+    borderTopWidth: 0,
+    borderWidth: 1,
+    bottom: 14,
+    height: 72,
+    left: 22,
     paddingBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.sm,
     paddingTop: theme.spacing.sm,
+    position: 'absolute',
+    right: 22,
     shadowColor: colors.shadow,
-    shadowOffset: { height: -8, width: 0 },
+    shadowOffset: { height: 12, width: 0 },
     shadowOpacity: 1,
     shadowRadius: 18,
   },
   tabItem: {
     borderRadius: theme.radius.md,
     marginHorizontal: theme.spacing.xs,
+  },
+  tabBarPressable: {
+    flex: 1,
   },
   tabLabel: {
     fontFamily: theme.typography.fontFamily.medium,
