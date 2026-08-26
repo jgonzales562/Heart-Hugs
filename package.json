@@ -22,7 +22,6 @@
     "expo": "~57.0.10",
     "expo-asset": "~57.0.6",
     "expo-audio": "~57.0.3",
-    "expo-constants": "~57.0.6",
     "expo-dev-client": "~57.0.10",
     "expo-linear-gradient": "~57.0.1",
     "expo-splash-screen": "~57.0.5",
@@ -40,7 +39,6 @@
   },
   "devDependencies": {
     "@react-native/jest-preset": "^0.86.2",
-    "@types/jest": "29.5.14",
     "@types/react": "~19.2.10",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.1",

@@ -1,6 +1,6 @@
 # Heart Hugs
 
-Heart Hugs is a local-first Expo app for short guided wellness practices. It helps someone choose a practice by their current need and available time, then keeps saved sessions, recent activity, completions, and resume position on their device.
+Heart Hugs is a local-first Expo app for short guided wellness practices. It helps someone choose a practice by their current need, then keeps saved sessions, recent activity, completions, and resume position on their device.
 
 ## Development
 
@@ -14,8 +14,7 @@ Native development uses the EAS development profiles in `eas.json`. The app curr
 
 ## Product structure
 
-- **Today** recommends a session from a selected need and time preference and surfaces resumable activity.
-- **Today** combines a guided recommendation with a simple list of every practice.
+- **Today** recommends practices for a selected need, surfaces resumable activity, and provides the complete catalog.
 - **Saved** contains local bookmarks, recent activity, and completion totals.
 - **Player** owns one mounted media session at a time, restores position, supports seeking and playback speed for audio, and records completion.
 - **Settings** contains practitioner information, the complete wellness disclaimer, safety information, privacy behavior, and content status.

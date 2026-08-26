@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react';
 
-import { DurationPreference, sessionRepository } from '../content/sessionRepository';
+import { sessionRepository } from '../content/sessionRepository';
 import { WELLNESS_STATE_KEY } from '../constants/storage';
 import { WellnessNeedId } from '../types/session';
 import {
@@ -29,7 +29,6 @@ type WellnessContextValue = {
   markSessionCompleted(sessionId: string): void;
   recordOpened(sessionId: string): void;
   saveProgress(sessionId: string, positionSeconds: number, durationSeconds: number): void;
-  setDurationPreference(duration: DurationPreference): void;
   setNeedPreference(needId: WellnessNeedId): void;
   state: WellnessState;
   toggleSaved(sessionId: string): void;
@@ -104,10 +103,6 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const setDurationPreference = useCallback((durationPreference: DurationPreference) => {
-    setState((currentState) => ({ ...currentState, durationPreference }));
-  }, []);
-
   const setNeedPreference = useCallback((needPreference: WellnessNeedId) => {
     setState((currentState) => ({ ...currentState, needPreference }));
   }, []);
@@ -123,7 +118,6 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       markSessionCompleted,
       recordOpened,
       saveProgress,
-      setDurationPreference,
       setNeedPreference,
       state,
       toggleSaved,
@@ -134,7 +128,6 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       markSessionCompleted,
       recordOpened,
       saveProgress,
-      setDurationPreference,
       setNeedPreference,
       state,
       toggleSaved,

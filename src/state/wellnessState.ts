@@ -1,4 +1,3 @@
-import { DurationPreference } from '../content/sessionRepository';
 import { WellnessNeedId } from '../types/session';
 
 export const WELLNESS_STATE_VERSION = 1;
@@ -20,7 +19,6 @@ export type MoodCheckIn = {
 
 export type WellnessState = {
   activityBySessionId: Record<string, SessionActivity>;
-  durationPreference: DurationPreference;
   moodCheckIns: MoodCheckIn[];
   needPreference: WellnessNeedId;
   savedSessionIds: string[];
@@ -29,7 +27,6 @@ export type WellnessState = {
 
 export const initialWellnessState: WellnessState = {
   activityBySessionId: {},
-  durationPreference: 10,
   moodCheckIns: [],
   needPreference: 'grounding',
   savedSessionIds: [],
@@ -61,13 +58,8 @@ export function parseWellnessState(
     const activityBySessionId = parseActivity(value.activityBySessionId, validIds);
     const moodCheckIns = parseMoodCheckIns(value.moodCheckIns);
     const needPreference = isNeedId(value.needPreference) ? value.needPreference : 'grounding';
-    const durationPreference = isDurationPreference(value.durationPreference)
-      ? value.durationPreference
-      : 10;
-
     return {
       activityBySessionId,
-      durationPreference,
       moodCheckIns,
       needPreference,
       savedSessionIds: Array.from(new Set(savedSessionIds)),
@@ -255,10 +247,6 @@ function sanitizeMoodNote(note: string) {
 
 function clampMoodValue(value: number) {
   return Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 50;
-}
-
-function isDurationPreference(value: unknown): value is DurationPreference {
-  return value === null || value === 5 || value === 10 || value === 15;
 }
 
 function isNeedId(value: unknown): value is WellnessNeedId {

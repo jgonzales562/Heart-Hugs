@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { recommendSessions } from '../recommendations';
 import { sessionRepository, validateSessionCatalog, wellnessNeeds } from '../sessionRepository';
 
 describe('session repository', () => {
@@ -12,23 +11,6 @@ describe('session repository', () => {
     const firstSession = sessionRepository.getAll()[0];
 
     expect(sessionRepository.getById(firstSession.id)).toBe(firstSession);
-    expect(sessionRepository.getCategories()[0]).toBe('All');
-  });
-
-  it('prioritizes the selected need and available time', () => {
-    const recommendations = recommendSessions({ durationMinutes: 10, needId: 'guided-imagery' });
-
-    expect(recommendations[0].needIds).toContain('guided-imagery');
-    expect(recommendations[0].durationMinutes).toBeLessThanOrEqual(10);
-  });
-
-  it('does not recommend a session longer than the available time when one fits', () => {
-    const recommendations = recommendSessions({
-      durationMinutes: 5,
-      needId: 'breathworks',
-    });
-
-    expect(recommendations[0].durationMinutes).toBeLessThanOrEqual(5);
   });
 
   it('exposes the requested practice filters', () => {

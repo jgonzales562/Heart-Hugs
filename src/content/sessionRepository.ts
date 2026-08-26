@@ -64,14 +64,9 @@ export const wellnessNeeds: readonly WellnessNeed[] = [
   },
 ];
 
-export const durationOptions = [5, 10, 15] as const;
-
-export type DurationPreference = (typeof durationOptions)[number] | null;
-
 export type SessionRepository = {
   getAll(): readonly Session[];
   getById(sessionId?: string): Session | undefined;
-  getCategories(): readonly string[];
   getDefault(): Session;
 };
 
@@ -130,12 +125,10 @@ if (validationIssues.length > 0) {
 }
 
 const sessionsById = new Map(sessionCatalog.map((session) => [session.id, session]));
-const categories = ['All', ...Array.from(new Set(sessionCatalog.map((session) => session.category)))];
 
 export const sessionRepository: SessionRepository = {
   getAll: () => sessionCatalog,
   getById: (sessionId) => (sessionId ? sessionsById.get(sessionId) : undefined),
-  getCategories: () => categories,
   getDefault: () => {
     const defaultSession = sessionCatalog.find((session) => session.isFeatured) ?? sessionCatalog[0];
 

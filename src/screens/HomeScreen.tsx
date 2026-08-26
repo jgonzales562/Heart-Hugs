@@ -19,7 +19,6 @@ import { Session } from '../types/session';
 export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
   const [isMoodDragging, setIsMoodDragging] = useState(false);
   const {
-    isHydrated,
     logMood,
     setNeedPreference,
     state,
@@ -131,9 +130,7 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
 
       <View style={styles.section}>
         <Text style={styles.sectionEyebrow}>RECOMMENDED FOR YOU</Text>
-        <Text style={styles.sectionTitle}>
-          {isHydrated ? `${selectedNeed?.label ?? 'Selected'} practices` : 'Finding a practice…'}
-        </Text>
+        <Text style={styles.sectionTitle}>{selectedNeed?.label ?? 'Selected'} practices</Text>
         {recommendations.length > 0 ? (
           <View style={styles.sessionList}>
             {recommendations.map((session, index) => (
