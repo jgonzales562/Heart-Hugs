@@ -1,6 +1,7 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { Settings, Sparkles } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
@@ -11,7 +12,9 @@ import {
   sessionRepository,
   wellnessNeeds,
 } from '../content/sessionRepository';
+import { getSessionArtwork } from '../data/sessionArtwork';
 import { useWellness } from '../state/WellnessProvider';
+import { isSessionResumable } from '../state/wellnessState';
 import { colors, theme } from '../theme';
 import { MainTabScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
@@ -34,20 +37,18 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
   );
   const recommendedSessionIds = new Set(recommendations.map((session) => session.id));
   const selectedNeed = wellnessNeeds.find((need) => need.id === state.needPreference);
-  const recentSessions = useMemo(
+  const activitySessions = useMemo(
     () =>
       Object.entries(state.activityBySessionId)
         .sort(([, left], [, right]) => right.lastPlayedAt.localeCompare(left.lastPlayedAt))
         .map(([sessionId]) => sessionRepository.getById(sessionId))
-        .filter((session): session is Session => Boolean(session))
-        .slice(0, 4),
+        .filter((session): session is Session => Boolean(session)),
     [state.activityBySessionId]
   );
-  const continueSession = recentSessions.find((session) => {
-    const activity = state.activityBySessionId[session.id];
-
-    return activity.positionSeconds >= 5 && activity.durationSeconds > activity.positionSeconds + 2;
-  });
+  const recentSessions = activitySessions.slice(0, 4);
+  const continueSession = activitySessions.find((session) =>
+    isSessionResumable(state.activityBySessionId[session.id])
+  );
 
   function openSession(session: Session) {
     navigation.navigate('Player', { sessionId: session.id });
@@ -220,14 +221,28 @@ function ContinueCard({ activity, onPress, session }: ContinueCardProps) {
       onPress={onPress}
       style={styles.continueCard}
     >
-      <Text style={[styles.sectionEyebrow, styles.continueEyebrow]}>CONTINUE LISTENING</Text>
-      <Text style={styles.continueTitle}>{session.title}</Text>
-      <PlaybackProgress
-        currentTime={activity.positionSeconds}
-        duration={activity.durationSeconds}
-        progress={progress}
-        tone="overlay"
-      />
+      <ImageBackground
+        imageStyle={styles.continueArtworkImage}
+        resizeMode="cover"
+        source={getSessionArtwork(session)}
+        style={styles.continueArtwork}
+      >
+        <LinearGradient
+          colors={['rgba(27, 16, 55, 0.08)', 'rgba(27, 16, 55, 0.9)']}
+          style={styles.continueOverlay}
+        >
+          <Text style={[styles.sectionEyebrow, styles.continueEyebrow]}>
+            CONTINUE LISTENING
+          </Text>
+          <Text style={styles.continueTitle}>{session.title}</Text>
+          <PlaybackProgress
+            currentTime={activity.positionSeconds}
+            duration={activity.durationSeconds}
+            progress={progress}
+            tone="overlay"
+          />
+        </LinearGradient>
+      </ImageBackground>
     </BreathingPressable>
   );
 }
@@ -273,12 +288,25 @@ const styles = StyleSheet.create({
     width: 46,
   },
   continueCard: {
-    backgroundColor: colors.magentaDeep,
-    borderColor: colors.hotPink,
+    backgroundColor: colors.midnight,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     elevation: 4,
+    overflow: 'hidden',
+  },
+  continueArtwork: {
+    minHeight: 176,
+    width: '100%',
+  },
+  continueArtworkImage: {
+    borderRadius: theme.radius.lg,
+  },
+  continueOverlay: {
+    flex: 1,
     gap: theme.spacing.sm,
+    justifyContent: 'flex-end',
+    minHeight: 176,
     padding: theme.spacing.lg,
   },
   continueTitle: {

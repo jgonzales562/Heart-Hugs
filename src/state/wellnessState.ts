@@ -91,6 +91,19 @@ export function recordMoodCheckIn(
   };
 }
 
+export function isSessionResumable(
+  activity: Pick<SessionActivity, 'durationSeconds' | 'positionSeconds'> | undefined
+) {
+  if (!activity) {
+    return false;
+  }
+
+  const position = finitePositive(activity.positionSeconds);
+  const duration = finitePositive(activity.durationSeconds);
+
+  return position > 0 && (duration === 0 || position < duration);
+}
+
 export function toggleSavedSession(state: WellnessState, sessionId: string): WellnessState {
   const isSaved = state.savedSessionIds.includes(sessionId);
 

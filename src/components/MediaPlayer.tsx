@@ -26,6 +26,7 @@ import { PlaybackKind } from '../utils/PlaybackCoordinator';
 type MediaPlayerProps = {
   initialPosition?: number;
   onComplete?: () => void;
+  onPause?: (currentTime: number, duration: number) => void;
   onProgress?: (currentTime: number, duration: number) => void;
   session: Session;
 };
@@ -68,6 +69,7 @@ export function MediaPlayer(props: MediaPlayerProps) {
 function AudioSessionPlayer({
   initialPosition = 0,
   onComplete,
+  onPause,
   onProgress,
   session,
 }: MediaPlayerProps) {
@@ -81,8 +83,12 @@ function AudioSessionPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const hasRestoredPosition = useRef(!shouldRestorePosition);
   const hasReportedCompletion = useRef(false);
+  const wasPlaying = useRef(false);
   const reportProgress = useEffectEvent((position: number, totalDuration: number) => {
     onProgress?.(position, totalDuration);
+  });
+  const reportPause = useEffectEvent((position: number, totalDuration: number) => {
+    onPause?.(position, totalDuration);
   });
   const reportCompletion = useEffectEvent(() => {
     onComplete?.();
@@ -131,6 +137,14 @@ function AudioSessionPlayer({
       reportProgress(currentTime, duration);
     }
   }, [currentTime, duration]);
+
+  useEffect(() => {
+    if (wasPlaying.current && !status.playing && !status.didJustFinish) {
+      reportPause(currentTime, duration);
+    }
+
+    wasPlaying.current = status.playing;
+  }, [currentTime, duration, status.didJustFinish, status.playing]);
 
   async function togglePlayback() {
     if (status.playing) {
@@ -272,6 +286,7 @@ function AudioSessionPlayer({
 function VideoSessionPlayer({
   initialPosition = 0,
   onComplete,
+  onPause,
   onProgress,
   session,
 }: MediaPlayerProps) {
@@ -330,6 +345,7 @@ function VideoSessionPlayer({
   }, [playbackInstanceId]);
 
   useRegisteredPlaybackPauser(playbackInstanceId, 'video', () => {
+    onPause?.(currentTime, duration);
     player.pause();
     setIsPlaying(false);
   });
@@ -677,6 +693,7 @@ function PlaybackRateButton({ onPress, rate }: { onPress: () => void; rate: numb
 
 const styles = StyleSheet.create({
   surface: {
+    alignSelf: 'center',
     backgroundColor: colors.deepOcean,
     borderRadius: theme.radius.lg,
     elevation: 5,
@@ -686,10 +703,11 @@ const styles = StyleSheet.create({
     shadowOffset: { height: 12, width: 0 },
     shadowOpacity: 1,
     shadowRadius: 20,
+    width: '92%',
   },
   audioGradient: {
-    gap: theme.spacing.xl,
-    padding: theme.spacing.xl,
+    gap: theme.spacing.md,
+    padding: theme.spacing.lg,
   },
   statusMessage: {
     alignItems: 'center',
@@ -726,9 +744,9 @@ const styles = StyleSheet.create({
   audioFocus: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: theme.spacing.lg,
+    gap: theme.spacing.md,
     justifyContent: 'center',
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.xs,
   },
   audioRing: {
     alignItems: 'center',
@@ -736,9 +754,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.28)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
-    height: 138,
+    height: 112,
     justifyContent: 'center',
-    width: 138,
+    width: 112,
   },
   transportButton: {
     alignItems: 'center',
@@ -746,9 +764,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
-    height: 48,
+    height: 44,
     justifyContent: 'center',
-    width: 48,
+    width: 44,
   },
   transportButtonDisabled: {
     opacity: 0.45,
@@ -760,7 +778,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
-    minHeight: 42,
+    minHeight: 38,
     minWidth: 62,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.sm,
@@ -775,9 +793,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   videoCopy: {
-    gap: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.lg,
+    gap: theme.spacing.sm,
+    paddingBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
   },
   videoTransportRow: {
     alignItems: 'center',
@@ -821,7 +839,7 @@ const styles = StyleSheet.create({
     color: colors.whiteMuted,
   },
   videoShell: {
-    aspectRatio: 16 / 10,
+    aspectRatio: 16 / 9,
     backgroundColor: colors.navy,
     overflow: 'hidden',
     position: 'relative',

@@ -23,7 +23,7 @@ export function PlaybackToggle({
   variant = 'compact',
 }: PlaybackToggleProps) {
   const isLarge = variant === 'large';
-  const iconSize = isLarge ? 38 : 20;
+  const iconSize = isLarge ? 30 : 20;
   const pressGuardTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPressGuardActive = useRef(false);
 
@@ -88,12 +88,12 @@ const styles = StyleSheet.create({
   largeButton: {
     backgroundColor: colors.leafDeep,
     elevation: 6,
-    height: 104,
+    height: 84,
     shadowColor: colors.shadow,
     shadowOffset: { height: 12, width: 0 },
     shadowOpacity: 1,
     shadowRadius: 18,
-    width: 104,
+    width: 84,
   },
   compactButton: {
     backgroundColor: colors.transparentNavy,

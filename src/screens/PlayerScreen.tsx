@@ -1,7 +1,6 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Bookmark, Check, Clock3 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ImageBackground, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
@@ -50,6 +49,10 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
     saveProgress(activeSession.id, currentTime, duration);
   }
 
+  function handlePause(currentTime: number, duration: number) {
+    saveProgress(activeSession.id, currentTime, duration, true);
+  }
+
   function handleCompletion() {
     markSessionCompleted(activeSession.id);
     setCompletedSessionId(activeSession.id);
@@ -60,70 +63,68 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
   }
 
   return (
-    <GradientScreen contentContainerStyle={styles.screen} includeBottomSafeArea scroll>
-      <ImageBackground
-        imageStyle={styles.heroImage}
-        source={getSessionArtwork(activeSession)}
-        style={styles.hero}
-      >
-        <LinearGradient
-          colors={['rgba(27, 16, 55, 0.08)', 'rgba(27, 16, 55, 0.9)']}
-          style={styles.heroOverlay}
+    <GradientScreen
+      backgroundImageSource={getSessionArtwork(activeSession)}
+      backgroundOverlayColors={['transparent', 'transparent']}
+      contentContainerStyle={styles.screen}
+      includeBottomSafeArea
+      scroll
+    >
+      <View style={styles.playerNav}>
+        <BreathingPressable
+          accessibilityLabel="Return to the previous screen"
+          accessibilityRole="button"
+          hitSlop={theme.spacing.xs}
+          onPress={navigation.goBack}
+          style={styles.navButton}
         >
-          <View style={styles.heroActions}>
-            <BreathingPressable
-              accessibilityLabel="Return to the previous screen"
-              accessibilityRole="button"
-              hitSlop={theme.spacing.xs}
-              onPress={navigation.goBack}
-              style={styles.heroButton}
-            >
-              <ArrowLeft color={colors.white} size={22} />
-            </BreathingPressable>
-            <BreathingPressable
-              accessibilityLabel={isSaved ? `Remove ${activeSession.title} from Saved` : `Save ${activeSession.title}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSaved }}
-              hitSlop={theme.spacing.xs}
-              onPress={() => toggleSaved(activeSession.id)}
-              style={[
-                styles.heroButton,
-                isSaved && styles.savedButton,
-              ]}
-            >
-              <Bookmark
-                color={isSaved ? colors.navy : colors.white}
-                fill={isSaved ? colors.white : 'transparent'}
-                size={21}
-              />
-            </BreathingPressable>
-          </View>
+          <ArrowLeft color={colors.navy} size={22} />
+        </BreathingPressable>
+        <BreathingPressable
+          accessibilityLabel={isSaved ? `Remove ${activeSession.title} from Saved` : `Save ${activeSession.title}`}
+          accessibilityRole="button"
+          accessibilityState={{ selected: isSaved }}
+          hitSlop={theme.spacing.xs}
+          onPress={() => toggleSaved(activeSession.id)}
+          style={[
+            styles.navButton,
+            isSaved && styles.savedButton,
+          ]}
+        >
+          <Bookmark
+            color={colors.navy}
+            fill={isSaved ? colors.white : 'transparent'}
+            size={21}
+          />
+        </BreathingPressable>
+      </View>
 
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroEyebrow}>{activeSession.category}</Text>
-            <Text style={styles.title}>{activeSession.title}</Text>
-            <View style={styles.heroMetaRow}>
-              <Clock3 color={colors.whiteMuted} size={15} />
-              <Text style={styles.heroMeta}>{activeSession.durationMinutes} min</Text>
-            </View>
+      <View style={styles.sessionIntro}>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroEyebrow}>{activeSession.category}</Text>
+          <Text style={styles.title}>{activeSession.title}</Text>
+          <View style={styles.heroMetaRow}>
+            <Clock3 color={colors.white} size={15} />
+            <Text style={styles.heroMeta}>{activeSession.durationMinutes} min</Text>
           </View>
-        </LinearGradient>
-      </ImageBackground>
+        </View>
+      </View>
 
       <View style={styles.activeSession}>
         <View>
-          <Text style={styles.sectionEyebrow}>NOW PLAYING</Text>
-          <Text style={styles.sectionTitle}>Your session</Text>
+          <Text style={[styles.sectionEyebrow, styles.artworkEyebrow]}>NOW PLAYING</Text>
+          <Text style={[styles.sectionTitle, styles.artworkTitle]}>Your session</Text>
         </View>
         <MediaPlayer
           initialPosition={resumePosition}
           key={activeSession.id}
           onComplete={handleCompletion}
+          onPause={handlePause}
           onProgress={handleProgress}
           session={activeSession}
         />
         {resumePosition > 1 ? (
-          <Text accessibilityLiveRegion="polite" style={styles.resumeNote}>
+          <Text accessibilityLiveRegion="polite" style={[styles.resumeNote, styles.artworkSupportingText]}>
             Resumed from your last listening position.
           </Text>
         ) : null}
@@ -149,8 +150,8 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionEyebrow}>KEEP EXPLORING</Text>
-        <Text style={styles.sectionTitle}>More for this moment</Text>
+        <Text style={[styles.sectionEyebrow, styles.artworkEyebrow]}>KEEP EXPLORING</Text>
+        <Text style={[styles.sectionTitle, styles.artworkTitle]}>More for this moment</Text>
         <View style={styles.sessionList}>
           {relatedSessions.map((session) => (
             <SessionCard
@@ -197,38 +198,33 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
     paddingTop: theme.spacing.sm,
   },
-  hero: {
-    marginBottom: theme.spacing.xl,
-    minHeight: 286,
-  },
-  heroImage: {
-    borderRadius: 34,
-  },
-  heroOverlay: {
-    borderRadius: 34,
-    flex: 1,
-    justifyContent: 'space-between',
-    minHeight: 286,
-    overflow: 'hidden',
-    padding: theme.spacing.lg,
-  },
-  heroActions: {
+  playerNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  heroButton: {
+  navButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(8, 37, 56, 0.46)',
-    borderColor: 'rgba(255, 255, 255, 0.26)',
+    backgroundColor: colors.offWhite,
+    borderColor: colors.border,
     borderRadius: theme.radius.full,
     borderWidth: 1,
-    height: 44,
+    elevation: 3,
+    height: 46,
     justifyContent: 'center',
-    width: 44,
+    shadowColor: colors.shadow,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    width: 46,
   },
   savedButton: {
-    backgroundColor: colors.leafBright,
-    borderColor: colors.leafBright,
+    backgroundColor: colors.sunshine,
+    borderColor: colors.sunshine,
+  },
+  sessionIntro: {
+    justifyContent: 'flex-end',
+    marginBottom: theme.spacing.xl,
+    minHeight: 210,
   },
   heroCopy: {
     gap: theme.spacing.xs,
@@ -239,6 +235,9 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.size.xs,
     letterSpacing: 1.7,
     lineHeight: theme.typography.lineHeight.sm,
+    textShadowColor: 'rgba(19, 9, 42, 0.9)',
+    textShadowOffset: { height: 1, width: 0 },
+    textShadowRadius: 6,
     textTransform: 'uppercase',
   },
   title: {
@@ -247,6 +246,9 @@ const styles = StyleSheet.create({
     fontSize: 34,
     letterSpacing: -0.8,
     lineHeight: 40,
+    textShadowColor: 'rgba(19, 9, 42, 0.92)',
+    textShadowOffset: { height: 2, width: 0 },
+    textShadowRadius: 9,
   },
   heroMetaRow: {
     alignItems: 'center',
@@ -260,6 +262,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.sm,
+    textShadowColor: 'rgba(19, 9, 42, 0.9)',
+    textShadowOffset: { height: 1, width: 0 },
+    textShadowRadius: 5,
   },
   activeSession: {
     gap: theme.spacing.md,
@@ -281,6 +286,24 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.size.xs,
     letterSpacing: 1.5,
     lineHeight: theme.typography.lineHeight.sm,
+  },
+  artworkTitle: {
+    color: colors.white,
+    textShadowColor: 'rgba(19, 9, 42, 0.7)',
+    textShadowOffset: { height: 1, width: 0 },
+    textShadowRadius: 7,
+  },
+  artworkEyebrow: {
+    color: colors.sunshineSoft,
+    textShadowColor: 'rgba(19, 9, 42, 0.76)',
+    textShadowOffset: { height: 1, width: 0 },
+    textShadowRadius: 5,
+  },
+  artworkSupportingText: {
+    color: colors.whiteMuted,
+    textShadowColor: 'rgba(19, 9, 42, 0.76)',
+    textShadowOffset: { height: 1, width: 0 },
+    textShadowRadius: 4,
   },
   resumeNote: {
     color: colors.textSecondary,

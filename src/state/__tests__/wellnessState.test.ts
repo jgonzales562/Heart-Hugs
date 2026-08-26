@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   initialWellnessState,
+  isSessionResumable,
   parseWellnessState,
   recordMoodCheckIn,
   recordPlaybackProgress,
@@ -49,6 +50,16 @@ describe('wellness state', () => {
       completionCount: 1,
       positionSeconds: 0,
     });
+    expect(isSessionResumable(progressed.activityBySessionId['session-one'])).toBe(true);
+    expect(isSessionResumable(completed.activityBySessionId['session-one'])).toBe(false);
+  });
+
+  it('keeps any started unfinished session eligible to continue', () => {
+    expect(
+      isSessionResumable({ durationSeconds: 120, positionSeconds: 0.25 })
+    ).toBe(true);
+    expect(isSessionResumable({ durationSeconds: 0, positionSeconds: 12 })).toBe(true);
+    expect(isSessionResumable({ durationSeconds: 120, positionSeconds: 120 })).toBe(false);
   });
 
   it('logs and hydrates mood check-ins locally', () => {

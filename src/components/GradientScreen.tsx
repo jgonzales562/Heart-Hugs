@@ -1,6 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode } from 'react';
-import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import {
+  ImageBackground,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  View,
+  ViewStyle,
+  type ImageSourcePropType,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Defs,
@@ -14,6 +22,8 @@ import {
 import { gradients, theme } from '../theme';
 
 type GradientScreenProps = {
+  backgroundImageSource?: ImageSourcePropType;
+  backgroundOverlayColors?: readonly [string, string, ...string[]];
   children: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
   gradientColors?: readonly [string, string, ...string[]];
@@ -23,6 +33,12 @@ type GradientScreenProps = {
 };
 
 export function GradientScreen({
+  backgroundImageSource,
+  backgroundOverlayColors = [
+    'rgba(27, 16, 55, 0.38)',
+    'rgba(27, 16, 55, 0.74)',
+    'rgba(19, 9, 42, 0.92)',
+  ],
   children,
   contentContainerStyle,
   gradientColors = gradients.screen,
@@ -31,8 +47,21 @@ export function GradientScreen({
   scrollEnabled = true,
 }: GradientScreenProps) {
   return (
-    <LinearGradient colors={gradientColors} style={styles.gradient}>
-      <CircularGradientBackdrop />
+    <View style={styles.gradient}>
+      {backgroundImageSource ? (
+        <ImageBackground
+          imageStyle={styles.backgroundImage}
+          resizeMode="cover"
+          source={backgroundImageSource}
+          style={styles.backgroundLayer}
+        >
+          <LinearGradient colors={backgroundOverlayColors} style={styles.backgroundOverlay} />
+        </ImageBackground>
+      ) : (
+        <LinearGradient colors={gradientColors} style={styles.backgroundLayer}>
+          <CircularGradientBackdrop />
+        </LinearGradient>
+      )}
       <SafeAreaView
         edges={includeBottomSafeArea ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         style={styles.safeArea}
@@ -49,7 +78,7 @@ export function GradientScreen({
           <View style={[styles.content, contentContainerStyle]}>{children}</View>
         )}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -116,6 +145,16 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
     overflow: 'hidden',
+  },
+  backgroundImage: {
+    height: '100%',
+    width: '100%',
+  },
+  backgroundLayer: {
+    ...StyleSheet.absoluteFill,
+  },
+  backgroundOverlay: {
+    flex: 1,
   },
   decorativeLayer: {
     bottom: 0,
