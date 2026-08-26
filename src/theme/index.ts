@@ -98,8 +98,8 @@ export const gradients = {
   card: [colors.lavenderSoft, colors.peachSoft, colors.tealMist] as const,
   quietNight: [colors.midnight, colors.violetDeep, colors.magentaDeep] as const,
   player: [colors.violetDeep, colors.midnight, colors.magentaDeep] as const,
-  screen: [colors.canvas, colors.lavenderSoft, colors.tealMist] as const,
-  welcome: [colors.sunshineSoft, colors.peachSoft, colors.lavenderSoft] as const,
+  screen: ['#FFE8B8', '#E7C8FF', '#B7F4EA'] as const,
+  welcome: ['#FFE071', '#FFAE92', '#D3B2FF'] as const,
 };
 
 export const theme = {

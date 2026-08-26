@@ -1,12 +1,18 @@
 export type MediaType = 'audio' | 'video';
-export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 export type ContentStatus = 'prototype' | 'reviewed';
 export type WellnessNeedId =
-  | 'calm'
   | 'grounding'
-  | 'recovery'
-  | 'self-compassion'
-  | 'sleep';
+  | 'guided-imagery'
+  | 'mindfulness'
+  | 'mood-elevating-positions'
+  | 'nature-sounds'
+  | 'shaking'
+  | 'gentle-stretching'
+  | 'breathworks'
+  | 'sound-bath'
+  | 'natural-remedies'
+  | 'nature-walk'
+  | 'manifestation';
 
 export type Session = {
   authorName: string;
@@ -15,7 +21,6 @@ export type Session = {
   id: string;
   title: string;
   description: string;
-  difficulty: Difficulty;
   durationMinutes: number;
   category: string;
   mediaType: MediaType;

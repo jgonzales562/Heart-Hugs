@@ -1,15 +1,13 @@
 import { Settings, Sparkles } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
+import { MoodThermometer } from '../components/MoodThermometer';
 import { PlaybackProgress } from '../components/PlaybackProgress';
 import { SessionCard } from '../components/SessionCard';
-import { recommendSessions } from '../content/recommendations';
 import {
-  DurationPreference,
-  durationOptions,
   sessionRepository,
   wellnessNeeds,
 } from '../content/sessionRepository';
@@ -19,9 +17,10 @@ import { MainTabScreenProps } from '../types/navigation';
 import { Session } from '../types/session';
 
 export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
+  const [isMoodDragging, setIsMoodDragging] = useState(false);
   const {
     isHydrated,
-    setDurationPreference,
+    logMood,
     setNeedPreference,
     state,
     toggleSaved,
@@ -29,13 +28,12 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
   const sessions = sessionRepository.getAll();
   const recommendations = useMemo(
     () =>
-      recommendSessions({
-        durationMinutes: state.durationPreference,
-        needId: state.needPreference,
-      }),
-    [state.durationPreference, state.needPreference]
+      sessions.filter((session) =>
+        session.needIds.includes(state.needPreference)
+      ),
+    [sessions, state.needPreference]
   );
-  const recommendedSession = recommendations[0] ?? sessionRepository.getDefault();
+  const recommendedSessionIds = new Set(recommendations.map((session) => session.id));
   const selectedNeed = wellnessNeeds.find((need) => need.id === state.needPreference);
   const recentSessions = useMemo(
     () =>
@@ -56,12 +54,12 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
     navigation.navigate('Player', { sessionId: session.id });
   }
 
-  function renderDurationLabel(duration: DurationPreference) {
-    return duration === null ? 'Any' : `${duration} min`;
-  }
-
   return (
-    <GradientScreen contentContainerStyle={styles.screen} scroll>
+    <GradientScreen
+      contentContainerStyle={styles.screen}
+      scroll
+      scrollEnabled={!isMoodDragging}
+    >
       <View style={styles.topBar}>
         <View style={styles.brandCopy}>
           <Text style={styles.eyebrow}>HEART HUGS</Text>
@@ -77,6 +75,12 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
           <Settings color={colors.textPrimary} size={21} />
         </BreathingPressable>
       </View>
+
+      <MoodThermometer
+        latestCheckIn={state.moodCheckIns[0]}
+        onDragStateChange={setIsMoodDragging}
+        onLogMood={logMood}
+      />
 
       {continueSession ? (
         <ContinueCard
@@ -105,6 +109,7 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
               <BreathingPressable
                 accessibilityRole="radio"
                 accessibilityState={{ checked: isSelected }}
+                containerStyle={styles.needButtonContainer}
                 key={need.id}
                 onPress={() => setNeedPreference(need.id)}
                 style={[
@@ -125,43 +130,31 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionEyebrow}>HOW MUCH TIME DO YOU HAVE?</Text>
-        <View accessibilityRole="radiogroup" style={styles.durationRow}>
-          {[...durationOptions, null].map((duration) => {
-            const isSelected = duration === state.durationPreference;
-
-            return (
-              <BreathingPressable
-                accessibilityRole="radio"
-                accessibilityState={{ checked: isSelected }}
-                key={duration ?? 'any'}
-                onPress={() => setDurationPreference(duration)}
-                style={[
-                  styles.durationButton,
-                  isSelected && styles.selectedDurationButton,
-                ]}
-              >
-                <Text
-                  style={[styles.durationText, isSelected && styles.selectedDurationText]}
-                >
-                  {renderDurationLabel(duration)}
-                </Text>
-              </BreathingPressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionEyebrow}>RECOMMENDED FOR YOU</Text>
-        <Text style={styles.sectionTitle}>{isHydrated ? 'A gentle next step' : 'Finding a practice…'}</Text>
-        <SessionCard
-          isSaved={state.savedSessionIds.includes(recommendedSession.id)}
-          onPress={openSession}
-          onToggleSaved={(session) => toggleSaved(session.id)}
-          session={recommendedSession}
-          variant="large"
-        />
+        <Text style={styles.sectionTitle}>
+          {isHydrated ? `${selectedNeed?.label ?? 'Selected'} practices` : 'Finding a practice…'}
+        </Text>
+        {recommendations.length > 0 ? (
+          <View style={styles.sessionList}>
+            {recommendations.map((session, index) => (
+              <SessionCard
+                isSaved={state.savedSessionIds.includes(session.id)}
+                key={session.id}
+                onPress={openSession}
+                onToggleSaved={(selectedSession) => toggleSaved(selectedSession.id)}
+                session={session}
+                variant={index === 0 ? 'large' : 'compact'}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyRecommendation}>
+            <Text style={styles.emptyRecommendationTitle}>More sessions are on the way.</Text>
+            <Text style={styles.emptyRecommendationText}>
+              We are preparing practices for {selectedNeed?.label ?? 'this filter'}.
+            </Text>
+          </View>
+        )}
       </View>
 
       {recentSessions.length > 0 ? (
@@ -194,7 +187,7 @@ export function TodayScreen({ navigation }: MainTabScreenProps<'Today'>) {
         <Text style={styles.sectionTitle}>Browse at your own pace</Text>
         <View style={styles.sessionList}>
           {sessions
-            .filter((session) => session.id !== recommendedSession.id)
+            .filter((session) => !recommendedSessionIds.has(session.id))
             .map((session) => (
               <SessionCard
                 isSaved={state.savedSessionIds.includes(session.id)}
@@ -338,13 +331,19 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: theme.spacing.sm,
   },
+  needButtonContainer: {
+    flexBasis: '46%',
+    flexGrow: 1,
+    maxWidth: '48%',
+  },
   needButton: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: theme.radius.md,
     borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
     minHeight: 52,
-    minWidth: '46%',
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
   },
@@ -368,34 +367,25 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.md,
   },
-  durationRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  durationButton: {
-    alignItems: 'center',
+  emptyRecommendation: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
-    minHeight: 44,
-    minWidth: 72,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    gap: theme.spacing.xs,
+    padding: theme.spacing.lg,
   },
-  selectedDurationButton: {
-    backgroundColor: colors.violetDeep,
-    borderColor: colors.violetDeep,
-  },
-  durationText: {
-    color: colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.medium,
-    fontSize: theme.typography.size.sm,
-  },
-  selectedDurationText: {
-    color: colors.white,
+  emptyRecommendationTitle: {
+    color: colors.textPrimary,
     fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.md,
+    lineHeight: theme.typography.lineHeight.md,
+  },
+  emptyRecommendationText: {
+    color: colors.textSecondary,
+    fontFamily: theme.typography.fontFamily.regular,
+    fontSize: theme.typography.size.sm,
+    lineHeight: theme.typography.lineHeight.md,
   },
   recentSection: {
     gap: theme.spacing.md,

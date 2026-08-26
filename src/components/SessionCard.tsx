@@ -50,7 +50,7 @@ export function SessionCard({
       ]}
     >
       <Pressable
-        accessibilityLabel={`${session.title}, ${session.mediaType}, ${session.durationMinutes} minutes, ${session.difficulty}`}
+        accessibilityLabel={`${session.title}, ${session.mediaType}, ${session.durationMinutes} minutes`}
         accessibilityRole="button"
         onPress={() => onPress(session)}
         onPressIn={breatheIn}
@@ -107,11 +107,7 @@ export function SessionCard({
                   <Text style={styles.metaText}>{session.durationMinutes} min</Text>
                 </View>
                 {isLarge ? (
-                  <>
-                    <Text style={styles.metaDivider}>/</Text>
-                    <Text style={styles.metaText}>{session.difficulty}</Text>
-                    <Text style={styles.metaDivider}>/</Text>
-                  </>
+                  <Text style={styles.metaDivider}>/</Text>
                 ) : null}
                 <Text style={styles.metaText}>{session.category}</Text>
                 <ChevronRight color={colors.offWhite} size={18} style={styles.chevron} />

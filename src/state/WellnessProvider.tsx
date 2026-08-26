@@ -16,6 +16,7 @@ import {
   WellnessState,
   initialWellnessState,
   parseWellnessState,
+  recordMoodCheckIn,
   recordPlaybackProgress,
   recordSessionCompleted,
   recordSessionOpened,
@@ -24,6 +25,7 @@ import {
 
 type WellnessContextValue = {
   isHydrated: boolean;
+  logMood(value: number, note?: string): void;
   markSessionCompleted(sessionId: string): void;
   recordOpened(sessionId: string): void;
   saveProgress(sessionId: string, positionSeconds: number, durationSeconds: number): void;
@@ -85,6 +87,10 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     setState((currentState) => recordSessionCompleted(currentState, sessionId));
   }, []);
 
+  const logMood = useCallback((value: number, note = '') => {
+    setState((currentState) => recordMoodCheckIn(currentState, value, note));
+  }, []);
+
   const recordOpened = useCallback((sessionId: string) => {
     setState((currentState) => recordSessionOpened(currentState, sessionId));
   }, []);
@@ -113,6 +119,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const value = useMemo<WellnessContextValue>(
     () => ({
       isHydrated,
+      logMood,
       markSessionCompleted,
       recordOpened,
       saveProgress,
@@ -123,6 +130,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     }),
     [
       isHydrated,
+      logMood,
       markSessionCompleted,
       recordOpened,
       saveProgress,

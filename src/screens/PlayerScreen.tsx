@@ -105,8 +105,6 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
             <View style={styles.heroMetaRow}>
               <Clock3 color={colors.whiteMuted} size={15} />
               <Text style={styles.heroMeta}>{activeSession.durationMinutes} min</Text>
-              <Text style={styles.heroMetaDivider}>·</Text>
-              <Text style={styles.heroMeta}>{activeSession.difficulty}</Text>
             </View>
           </View>
         </LinearGradient>
@@ -262,9 +260,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.sm,
     lineHeight: theme.typography.lineHeight.sm,
-  },
-  heroMetaDivider: {
-    color: colors.whiteMuted,
   },
   activeSession: {
     gap: theme.spacing.md,

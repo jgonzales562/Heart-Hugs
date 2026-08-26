@@ -19,6 +19,7 @@ type GradientScreenProps = {
   gradientColors?: readonly [string, string, ...string[]];
   includeBottomSafeArea?: boolean;
   scroll?: boolean;
+  scrollEnabled?: boolean;
 };
 
 export function GradientScreen({
@@ -27,6 +28,7 @@ export function GradientScreen({
   gradientColors = gradients.screen,
   includeBottomSafeArea = false,
   scroll = false,
+  scrollEnabled = true,
 }: GradientScreenProps) {
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient}>
@@ -38,6 +40,7 @@ export function GradientScreen({
         {scroll ? (
           <ScrollView
             contentContainerStyle={[styles.content, contentContainerStyle]}
+            scrollEnabled={scrollEnabled}
             showsVerticalScrollIndicator={false}
           >
             {children}
@@ -61,27 +64,27 @@ function CircularGradientBackdrop() {
     >
       <Defs>
         <RadialGradient id="sunsetAura" cx="48%" cy="45%" r="56%">
-          <Stop offset="0%" stopColor="#FFD04B" stopOpacity="0.62" />
-          <Stop offset="30%" stopColor="#FF8B3D" stopOpacity="0.42" />
-          <Stop offset="60%" stopColor="#FF4F87" stopOpacity="0.24" />
+          <Stop offset="0%" stopColor="#FFDC38" stopOpacity="0.9" />
+          <Stop offset="30%" stopColor="#FF7A2F" stopOpacity="0.7" />
+          <Stop offset="60%" stopColor="#FF3F82" stopOpacity="0.46" />
           <Stop offset="100%" stopColor="#D63C91" stopOpacity="0" />
         </RadialGradient>
         <RadialGradient id="waterAura" cx="44%" cy="48%" r="58%">
-          <Stop offset="0%" stopColor="#66E2DA" stopOpacity="0.56" />
-          <Stop offset="38%" stopColor="#42CFC8" stopOpacity="0.32" />
-          <Stop offset="70%" stopColor="#7653C8" stopOpacity="0.2" />
+          <Stop offset="0%" stopColor="#49F0E3" stopOpacity="0.86" />
+          <Stop offset="38%" stopColor="#19CFC8" stopOpacity="0.6" />
+          <Stop offset="70%" stopColor="#6F3FD1" stopOpacity="0.38" />
           <Stop offset="100%" stopColor="#482073" stopOpacity="0" />
         </RadialGradient>
         <RadialGradient id="dreamAura" cx="52%" cy="46%" r="56%">
-          <Stop offset="0%" stopColor="#E4ED76" stopOpacity="0.45" />
-          <Stop offset="35%" stopColor="#E6D7FF" stopOpacity="0.36" />
-          <Stop offset="66%" stopColor="#D63C91" stopOpacity="0.18" />
+          <Stop offset="0%" stopColor="#EAF257" stopOpacity="0.74" />
+          <Stop offset="35%" stopColor="#C9A7FF" stopOpacity="0.62" />
+          <Stop offset="66%" stopColor="#E72B9A" stopOpacity="0.38" />
           <Stop offset="100%" stopColor="#8B236F" stopOpacity="0" />
         </RadialGradient>
         <SvgLinearGradient id="flowCurrent" x1="0%" x2="100%" y1="40%" y2="60%">
           <Stop offset="0%" stopColor="#42DBD3" stopOpacity="0" />
-          <Stop offset="35%" stopColor="#42DBD3" stopOpacity="0.16" />
-          <Stop offset="68%" stopColor="#FF4F87" stopOpacity="0.14" />
+          <Stop offset="35%" stopColor="#25E1D6" stopOpacity="0.34" />
+          <Stop offset="68%" stopColor="#FF3E8C" stopOpacity="0.32" />
           <Stop offset="100%" stopColor="#FFD04B" stopOpacity="0" />
         </SvgLinearGradient>
       </Defs>

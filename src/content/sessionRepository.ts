@@ -3,29 +3,64 @@ import { Session, WellnessNeed, WellnessNeedId } from '../types/session';
 
 export const wellnessNeeds: readonly WellnessNeed[] = [
   {
-    id: 'calm',
-    label: 'Calm my thoughts',
-    description: 'Slow down and make a little more room to breathe.',
-  },
-  {
     id: 'grounding',
-    label: 'Feel grounded',
+    label: 'Grounding',
     description: 'Reconnect with your body and the present moment.',
   },
   {
-    id: 'recovery',
-    label: 'Recover gently',
-    description: 'Find steadiness after an intense or tender moment.',
+    id: 'guided-imagery',
+    label: 'Guided Imagery',
+    description: 'Follow calming imagery into a more spacious inner landscape.',
   },
   {
-    id: 'self-compassion',
-    label: 'Be kinder to myself',
-    description: 'Meet a difficult experience with less self-criticism.',
+    id: 'mindfulness',
+    label: 'Mindfulness',
+    description: 'Notice thoughts, feelings, and sensations without judgment.',
   },
   {
-    id: 'sleep',
-    label: 'Prepare for rest',
-    description: 'Settle the day and ease toward sleep.',
+    id: 'mood-elevating-positions',
+    label: 'Mood Elevating Positions',
+    description: 'Explore supportive postures that encourage energy and emotional lift.',
+  },
+  {
+    id: 'nature-sounds',
+    label: 'Nature Sounds',
+    description: 'Settle into elemental soundscapes inspired by the natural world.',
+  },
+  {
+    id: 'shaking',
+    label: 'Shaking',
+    description: 'Move with rhythm and let stored energy travel through the body.',
+  },
+  {
+    id: 'gentle-stretching',
+    label: 'Gentle Stretching',
+    description: 'Create a little more space through soft, accessible movement.',
+  },
+  {
+    id: 'breathworks',
+    label: 'Breathworks',
+    description: 'Explore breathing rhythms that support focus and regulation.',
+  },
+  {
+    id: 'sound-bath',
+    label: 'Sound Bath',
+    description: 'Rest into resonant tones and spacious vibration.',
+  },
+  {
+    id: 'natural-remedies',
+    label: 'Natural Remedies',
+    description: 'Reconnect with simple sensory rituals inspired by the earth.',
+  },
+  {
+    id: 'nature-walk',
+    label: 'Nature Walk',
+    description: 'Move through an imagined landscape with calm attention.',
+  },
+  {
+    id: 'manifestation',
+    label: 'Manifestation',
+    description: 'Connect with inner energy, intention, and possibility.',
   },
 ];
 

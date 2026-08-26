@@ -3,6 +3,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   initialWellnessState,
   parseWellnessState,
+  recordMoodCheckIn,
   recordPlaybackProgress,
   recordSessionCompleted,
   recordSessionOpened,
@@ -48,5 +49,39 @@ describe('wellness state', () => {
       completionCount: 1,
       positionSeconds: 0,
     });
+  });
+
+  it('logs and hydrates mood check-ins locally', () => {
+    const checkedIn = recordMoodCheckIn(
+      initialWellnessState,
+      73.6,
+      '  I felt supported after talking with a friend.  ',
+      new Date('2026-08-25T18:30:00.000Z')
+    );
+    const hydrated = parseWellnessState(JSON.stringify(checkedIn), []);
+
+    expect(checkedIn.moodCheckIns[0]).toMatchObject({
+      recordedAt: '2026-08-25T18:30:00.000Z',
+      note: 'I felt supported after talking with a friend.',
+      value: 74,
+    });
+    expect(hydrated.moodCheckIns).toEqual(checkedIn.moodCheckIns);
+  });
+
+  it('clamps mood values and keeps the newest check-in first', () => {
+    const first = recordMoodCheckIn(
+      initialWellnessState,
+      -20,
+      '',
+      new Date('2026-08-25T18:00:00.000Z')
+    );
+    const second = recordMoodCheckIn(
+      first,
+      140,
+      '',
+      new Date('2026-08-25T19:00:00.000Z')
+    );
+
+    expect(second.moodCheckIns.map((checkIn) => checkIn.value)).toEqual([100, 0]);
   });
 });
