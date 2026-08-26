@@ -1,8 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Check, Thermometer } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { Check, Heart, Sparkles, Thermometer } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
+  Easing,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -30,6 +33,23 @@ const moodDescriptors = [
   { label: 'Feeling bright', max: 100, note: 'Make room for this energy and warmth.' },
 ] as const;
 
+const LOGGED_CONFIRMATION_DURATION_MS = 3_000;
+const celebrationParticles = [
+  { color: colors.hotPink, delay: 0.02, height: 8, rotation: '-110deg', width: 16, x: -142, y: -72 },
+  { color: colors.sunshine, delay: 0.08, height: 11, rotation: '-68deg', width: 11, x: -124, y: -118 },
+  { color: colors.aqua, delay: 0.14, height: 7, rotation: '-42deg', width: 17, x: -94, y: -146 },
+  { color: colors.magenta, delay: 0.04, height: 10, rotation: '74deg', width: 10, x: -64, y: -92 },
+  { color: colors.orange, delay: 0.11, height: 7, rotation: '120deg', width: 15, x: -36, y: -154 },
+  { color: colors.leafBright, delay: 0.17, height: 10, rotation: '48deg', width: 10, x: -12, y: -112 },
+  { color: colors.sunshine, delay: 0.05, height: 8, rotation: '145deg', width: 18, x: 18, y: -158 },
+  { color: colors.hotPink, delay: 0.13, height: 11, rotation: '88deg', width: 11, x: 46, y: -106 },
+  { color: colors.aqua, delay: 0.03, height: 7, rotation: '190deg', width: 16, x: 76, y: -148 },
+  { color: colors.orange, delay: 0.09, height: 10, rotation: '130deg', width: 10, x: 104, y: -94 },
+  { color: colors.magenta, delay: 0.16, height: 8, rotation: '220deg', width: 17, x: 132, y: -126 },
+  { color: colors.leafBright, delay: 0.06, height: 11, rotation: '170deg', width: 11, x: 148, y: -68 },
+] as const;
+const shouldUseNativeDriver = Platform.OS !== 'web';
+
 export function getMoodDescriptor(value: number) {
   const safeValue = clampMoodValue(value);
 
@@ -47,6 +67,9 @@ export function MoodThermometer({
   const [moodValue, setMoodValue] = useState(latestCheckIn?.value ?? 50);
   const [reflection, setReflection] = useState('');
   const [hasJustLogged, setHasJustLogged] = useState(false);
+  const [celebrationProgress] = useState(() => new Animated.Value(0));
+  const loggedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reduceMotion = useRef(false);
   const sliderRef = useRef<View | null>(null);
   const trackWidth = useRef(0);
   const trackLeftPageX = useRef<number | null>(null);
@@ -63,9 +86,27 @@ export function MoodThermometer({
   const descriptor = getMoodDescriptor(moodValue);
   const progressWidth = `${moodValue}%` as `${number}%`;
 
+  useEffect(() => {
+    let isMounted = true;
+
+    void AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
+      if (isMounted) {
+        reduceMotion.current = isEnabled;
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      celebrationProgress.stopAnimation();
+
+      if (loggedResetTimer.current) {
+        clearTimeout(loggedResetTimer.current);
+      }
+    };
+  }, [celebrationProgress]);
+
   function updateMoodValue(value: number) {
     setMoodValue(Math.round(clampMoodValue(value)));
-    setHasJustLogged(false);
   }
 
   function beginGesture(event: GestureResponderEvent) {
@@ -142,6 +183,27 @@ export function MoodThermometer({
     onLogMood(moodValue, reflection);
     setReflection('');
     setHasJustLogged(true);
+
+    if (loggedResetTimer.current) {
+      clearTimeout(loggedResetTimer.current);
+    }
+
+    celebrationProgress.stopAnimation();
+    celebrationProgress.setValue(0);
+
+    if (!reduceMotion.current) {
+      Animated.timing(celebrationProgress, {
+        duration: 1_600,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: shouldUseNativeDriver,
+      }).start();
+    }
+
+    loggedResetTimer.current = setTimeout(() => {
+      setHasJustLogged(false);
+      loggedResetTimer.current = null;
+    }, LOGGED_CONFIRMATION_DURATION_MS);
   }
 
   return (
@@ -232,10 +294,7 @@ export function MoodThermometer({
           accessibilityLabel="Mood reflection"
           maxLength={280}
           multiline
-          onChangeText={(text) => {
-            setReflection(text);
-            setHasJustLogged(false);
-          }}
+          onChangeText={setReflection}
           onPressIn={reflectionBreatheIn}
           onPressOut={reflectionBreatheOut}
           placeholder="Write something about this feeling…"
@@ -246,17 +305,219 @@ export function MoodThermometer({
         />
       </Animated.View>
 
-      <BreathingPressable
-        accessibilityLabel={`Log mood: ${descriptor.label}, ${moodValue} out of 100`}
-        accessibilityRole="button"
-        onPress={logMood}
-        style={[styles.logButton, hasJustLogged && styles.loggedButton]}
-      >
-        {hasJustLogged ? <Check color={colors.navy} size={18} strokeWidth={2.8} /> : null}
-        <Text style={[styles.logButtonText, hasJustLogged && styles.loggedButtonText]}>
-          {hasJustLogged ? 'Feeling logged' : 'Log this feeling'}
-        </Text>
-      </BreathingPressable>
+      <View style={styles.celebrationStage}>
+        <View pointerEvents="none" style={styles.celebrationLayer}>
+          <Animated.View
+            style={[
+              styles.celebrationGlow,
+              {
+                opacity: celebrationProgress.interpolate({
+                  inputRange: [0, 0.12, 0.52, 1],
+                  outputRange: [0, 0.62, 0.26, 0],
+                }),
+                transform: [
+                  {
+                    scale: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.3, 1.6],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.celebrationRing,
+              {
+                opacity: celebrationProgress.interpolate({
+                  inputRange: [0, 0.1, 0.68, 1],
+                  outputRange: [0, 0.92, 0.34, 0],
+                }),
+                transform: [
+                  {
+                    scale: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.58, 1.48],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.celebrationRing,
+              styles.celebrationRingAqua,
+              {
+                opacity: celebrationProgress.interpolate({
+                  inputRange: [0, 0.12, 0.26, 0.82, 1],
+                  outputRange: [0, 0, 0.86, 0.28, 0],
+                }),
+                transform: [
+                  {
+                    scale: celebrationProgress.interpolate({
+                      inputRange: [0, 0.12, 1],
+                      outputRange: [0.46, 0.46, 1.36],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.celebrationHeart,
+              {
+                opacity: celebrationProgress.interpolate({
+                  inputRange: [0, 0.12, 0.74, 1],
+                  outputRange: [0, 1, 0.92, 0],
+                }),
+                transform: [
+                  {
+                    translateX: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -24],
+                    }),
+                  },
+                  {
+                    translateY: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -104],
+                    }),
+                  },
+                  {
+                    rotate: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['-12deg', '18deg'],
+                    }),
+                  },
+                  {
+                    scale: celebrationProgress.interpolate({
+                      inputRange: [0, 0.2, 1],
+                      outputRange: [0.4, 1.25, 0.82],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Heart color={colors.hotPink} fill={colors.roseSoft} size={27} strokeWidth={2.5} />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.celebrationSparkle,
+              {
+                opacity: celebrationProgress.interpolate({
+                  inputRange: [0, 0.16, 0.76, 1],
+                  outputRange: [0, 1, 0.9, 0],
+                }),
+                transform: [
+                  {
+                    translateX: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 25],
+                    }),
+                  },
+                  {
+                    translateY: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -88],
+                    }),
+                  },
+                  {
+                    rotate: celebrationProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '72deg'],
+                    }),
+                  },
+                  {
+                    scale: celebrationProgress.interpolate({
+                      inputRange: [0, 0.24, 1],
+                      outputRange: [0.45, 1.38, 0.78],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Sparkles color={colors.sunshine} fill={colors.sunshineSoft} size={29} strokeWidth={2.6} />
+          </Animated.View>
+          {celebrationParticles.map((particle) => (
+            <Animated.View
+              key={`${particle.x}-${particle.y}`}
+              style={[
+                styles.celebrationParticle,
+                {
+                  backgroundColor: particle.color,
+                  borderRadius: particle.height === particle.width ? theme.radius.full : 2,
+                  height: particle.height,
+                  opacity: celebrationProgress.interpolate({
+                    inputRange: [0, particle.delay, particle.delay + 0.12, 0.78, 1],
+                    outputRange: [0, 0, 1, 0.94, 0],
+                  }),
+                  transform: [
+                    {
+                      translateX: celebrationProgress.interpolate({
+                        inputRange: [0, particle.delay, 1],
+                        outputRange: [0, 0, particle.x],
+                      }),
+                    },
+                    {
+                      translateY: celebrationProgress.interpolate({
+                        inputRange: [0, particle.delay, 1],
+                        outputRange: [0, 0, particle.y],
+                      }),
+                    },
+                    {
+                      rotate: celebrationProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', particle.rotation],
+                      }),
+                    },
+                    {
+                      scale: celebrationProgress.interpolate({
+                        inputRange: [0, particle.delay, particle.delay + 0.16, 1],
+                        outputRange: [0.35, 0.35, 1.24, 0.68],
+                      }),
+                    },
+                  ],
+                  width: particle.width,
+                },
+              ]}
+            />
+          ))}
+        </View>
+
+        <Animated.View
+          style={{
+            transform: [
+              {
+                scale: celebrationProgress.interpolate({
+                  inputRange: [0, 0.1, 0.24, 0.42, 0.62, 1],
+                  outputRange: [1, 1.12, 0.96, 1.07, 0.99, 1],
+                }),
+              },
+            ],
+          }}
+        >
+          <BreathingPressable
+            accessibilityLabel={`Log mood: ${descriptor.label}, ${moodValue} out of 100`}
+            accessibilityRole="button"
+            containerStyle={styles.logButtonContainer}
+            onPress={logMood}
+            style={[styles.logButton, hasJustLogged && styles.loggedButton]}
+          >
+            {hasJustLogged ? <Check color={colors.navy} size={18} strokeWidth={2.8} /> : null}
+            <Text
+              accessibilityLiveRegion="polite"
+              style={[styles.logButtonText, hasJustLogged && styles.loggedButtonText]}
+            >
+              {hasJustLogged ? 'Feeling logged' : 'Log this feeling'}
+            </Text>
+          </BreathingPressable>
+        </Animated.View>
+      </View>
 
       <View style={styles.history}>
         <Text accessibilityLiveRegion="polite" style={styles.historyText}>
@@ -431,6 +692,65 @@ const styles = StyleSheet.create({
     minHeight: 88,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
+  },
+  celebrationStage: {
+    overflow: 'visible',
+    position: 'relative',
+  },
+  celebrationLayer: {
+    bottom: 0,
+    height: 174,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  celebrationRing: {
+    borderColor: colors.hotPink,
+    borderRadius: theme.radius.full,
+    borderWidth: 3,
+    bottom: 0,
+    height: 52,
+    left: '8%',
+    position: 'absolute',
+    right: '8%',
+  },
+  celebrationRingAqua: {
+    borderColor: colors.aqua,
+    left: '13%',
+    right: '13%',
+  },
+  celebrationGlow: {
+    backgroundColor: colors.sunshine,
+    borderRadius: theme.radius.full,
+    bottom: 5,
+    height: 42,
+    left: '20%',
+    position: 'absolute',
+    right: '20%',
+  },
+  celebrationHeart: {
+    alignItems: 'center',
+    bottom: 14,
+    left: '50%',
+    marginLeft: -14,
+    position: 'absolute',
+  },
+  celebrationSparkle: {
+    alignItems: 'center',
+    bottom: 14,
+    left: '50%',
+    marginLeft: -12,
+    position: 'absolute',
+  },
+  celebrationParticle: {
+    bottom: 21,
+    left: '50%',
+    marginLeft: -5,
+    position: 'absolute',
+  },
+  logButtonContainer: {
+    position: 'relative',
+    zIndex: 1,
   },
   logButton: {
     alignItems: 'center',

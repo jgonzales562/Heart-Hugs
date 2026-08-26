@@ -9,6 +9,7 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
+  CheckIns: undefined;
   Today: undefined;
   Saved: undefined;
 };

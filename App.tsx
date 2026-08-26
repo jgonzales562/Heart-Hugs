@@ -3,7 +3,7 @@ import { NavigationContainer, DefaultTheme as NavigationDefaultTheme } from '@re
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { Bookmark, Heart } from 'lucide-react-native';
+import { BookHeart, Bookmark, Heart } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { BreathingPressable } from './src/components/BreathingPressable';
 import { WELLNESS_DISCLAIMER_VERSION } from './src/constants/disclaimer';
 import { DISCLAIMER_ACCEPTANCE_KEY } from './src/constants/storage';
 import { SettingsScreen } from './src/screens/AboutScreen';
+import { CheckInsScreen } from './src/screens/CheckInsScreen';
 import { TodayScreen } from './src/screens/HomeScreen';
 import { PlayerScreen } from './src/screens/PlayerScreen';
 import { SavedScreen } from './src/screens/SavedScreen';
@@ -74,6 +75,18 @@ function AppTabs() {
           tabBarIcon: ({ color, focused }) => (
             <Heart color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
           ),
+        }}
+      />
+      <Tab.Screen
+        name="CheckIns"
+        component={CheckInsScreen}
+        options={{
+          tabBarAccessibilityLabel: 'Check-ins',
+          tabBarIcon: ({ color, focused }) => (
+            <BookHeart color={color} size={22} strokeWidth={focused ? 2.6 : 2} />
+          ),
+          tabBarLabel: 'Check-ins',
+          title: 'Check-ins',
         }}
       />
       <Tab.Screen
