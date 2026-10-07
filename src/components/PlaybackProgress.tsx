@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type ReactElement } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,67 +10,58 @@ import {
 
 import { BreathingPressable } from './BreathingPressable';
 import { colors, theme } from '../theme';
+import {
+  getPlaybackProgress,
+  getPlaybackSeekTime,
+  sanitizePlaybackTime,
+} from '../utils/playbackProgress';
 import { formatPlaybackTime } from '../utils/time';
 
 type PlaybackProgressProps = {
-  accessibilityLabel?: string;
-  currentTime?: number;
-  duration?: number;
-  onSeek?: (time: number) => void | Promise<void>;
-  progress?: number;
-  tone?: 'soft' | 'overlay';
+  readonly accessibilityLabel?: string;
+  readonly currentTime?: number;
+  readonly duration?: number;
+  readonly onSeek?: (time: number) => void | Promise<void>;
+  readonly tone?: 'soft' | 'overlay';
 };
-
-export function sanitizePlaybackTime(value?: number) {
-  return Number.isFinite(value) ? Math.max(0, value ?? 0) : 0;
-}
-
-export function clampPlaybackProgress(value?: number) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(value ?? 0, 1));
-}
-
-export function getPlaybackProgress(currentTime?: number, duration?: number) {
-  const safeDuration = sanitizePlaybackTime(duration);
-
-  if (safeDuration <= 0) {
-    return 0;
-  }
-
-  return clampPlaybackProgress(sanitizePlaybackTime(currentTime) / safeDuration);
-}
-
-export function getPlaybackSeekTime(locationX?: number, width?: number, duration?: number) {
-  const safeWidth = sanitizePlaybackTime(width);
-
-  if (safeWidth <= 0) {
-    return 0;
-  }
-
-  return clampPlaybackProgress(sanitizePlaybackTime(locationX) / safeWidth) * sanitizePlaybackTime(duration);
-}
 
 export function PlaybackProgress({
   accessibilityLabel,
   currentTime,
   duration,
   onSeek,
-  progress,
   tone = 'soft',
-}: PlaybackProgressProps) {
+}: PlaybackProgressProps): ReactElement {
   const trackWidth = useRef(0);
   const safeCurrentTime = sanitizePlaybackTime(currentTime);
   const safeDuration = sanitizePlaybackTime(duration);
-  const clampedProgress = clampPlaybackProgress(progress);
-  const accessibilityMax = safeDuration || 1;
-  const accessibilityNow = safeDuration ? Math.min(safeCurrentTime, safeDuration) : 0;
+  const displayedCurrentTime = safeDuration
+    ? Math.min(safeCurrentTime, safeDuration)
+    : safeCurrentTime;
+  const progress = getPlaybackProgress(displayedCurrentTime, safeDuration);
+  const accessibilityMax = safeDuration || Math.max(displayedCurrentTime, 1);
   const isOverlay = tone === 'overlay';
   const isSeekEnabled = Boolean(onSeek) && safeDuration > 0;
+  const progressAccessibilityLabel =
+    accessibilityLabel ??
+    `Playback progress ${formatPlaybackTime(displayedCurrentTime)} of ${formatPlaybackTime(safeDuration)}`;
+  const progressAccessibilityValue = {
+    max: accessibilityMax,
+    min: 0,
+    now: displayedCurrentTime,
+    text: `${formatPlaybackTime(displayedCurrentTime)} of ${formatPlaybackTime(safeDuration)}`,
+  };
+  const progressFill = (
+    <View
+      style={[
+        styles.fill,
+        isOverlay && styles.overlayFill,
+        { width: `${progress * 100}%` },
+      ]}
+    />
+  );
 
-  function requestSeek(time: number) {
+  function requestSeek(time: number): void {
     if (!onSeek || !isSeekEnabled) {
       return;
     }
@@ -85,23 +76,23 @@ export function PlaybackProgress({
     }
   }
 
-  function handleTrackLayout(event: LayoutChangeEvent) {
+  function handleTrackLayout(event: LayoutChangeEvent): void {
     trackWidth.current = event.nativeEvent.layout.width;
   }
 
-  function handleTrackPress(event: GestureResponderEvent) {
+  function handleTrackPress(event: GestureResponderEvent): void {
     requestSeek(
       getPlaybackSeekTime(event.nativeEvent.locationX, trackWidth.current, safeDuration)
     );
   }
 
-  function handleAccessibilityAction(event: AccessibilityActionEvent) {
+  function handleAccessibilityAction(event: AccessibilityActionEvent): void {
     const seekStep = Math.max(5, safeDuration * 0.05);
 
     if (event.nativeEvent.actionName === 'increment') {
-      requestSeek(safeCurrentTime + seekStep);
+      requestSeek(displayedCurrentTime + seekStep);
     } else if (event.nativeEvent.actionName === 'decrement') {
-      requestSeek(safeCurrentTime - seekStep);
+      requestSeek(displayedCurrentTime - seekStep);
     }
   }
 
@@ -109,52 +100,40 @@ export function PlaybackProgress({
     <View style={styles.container}>
       <View style={styles.timeRow}>
         <Text style={[styles.timeText, isOverlay && styles.overlayTimeText]}>
-          {formatPlaybackTime(safeCurrentTime)}
+          {formatPlaybackTime(displayedCurrentTime)}
         </Text>
         <Text style={[styles.timeText, isOverlay && styles.overlayTimeText]}>
           {formatPlaybackTime(safeDuration)}
         </Text>
       </View>
-      <BreathingPressable
-        accessibilityActions={
-          isSeekEnabled
-            ? [
-                { label: 'Seek forward', name: 'increment' },
-                { label: 'Seek backward', name: 'decrement' },
-              ]
-            : undefined
-        }
-        accessibilityHint={isSeekEnabled ? 'Tap or adjust to seek through this session.' : undefined}
-        accessibilityLabel={
-          accessibilityLabel ??
-          `Playback progress ${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`
-        }
-        accessibilityRole={isSeekEnabled ? 'adjustable' : 'progressbar'}
-        accessibilityState={{ disabled: !isSeekEnabled }}
-        accessibilityValue={{
-          max: accessibilityMax,
-          min: 0,
-          now: accessibilityNow,
-          text: `${formatPlaybackTime(safeCurrentTime)} of ${formatPlaybackTime(safeDuration)}`,
-        }}
-        disabled={!isSeekEnabled}
-        hitSlop={{ bottom: 10, top: 10 }}
-        onAccessibilityAction={handleAccessibilityAction}
-        onLayout={handleTrackLayout}
-        onPress={handleTrackPress}
-        style={[
-          styles.track,
-          isOverlay && styles.overlayTrack,
-        ]}
-      >
-        <View
-          style={[
-            styles.fill,
-            isOverlay && styles.overlayFill,
-            { width: `${clampedProgress * 100}%` },
+      {isSeekEnabled ? (
+        <BreathingPressable
+          accessibilityActions={[
+            { label: 'Seek forward', name: 'increment' },
+            { label: 'Seek backward', name: 'decrement' },
           ]}
-        />
-      </BreathingPressable>
+          accessibilityHint="Tap or adjust to seek through this session."
+          accessibilityLabel={progressAccessibilityLabel}
+          accessibilityRole="adjustable"
+          accessibilityValue={progressAccessibilityValue}
+          onAccessibilityAction={handleAccessibilityAction}
+          onLayout={handleTrackLayout}
+          onPress={handleTrackPress}
+          style={styles.seekTarget}
+        >
+          <View style={[styles.track, isOverlay && styles.overlayTrack]}>{progressFill}</View>
+        </BreathingPressable>
+      ) : (
+        <View
+          accessible
+          accessibilityLabel={progressAccessibilityLabel}
+          accessibilityRole="progressbar"
+          accessibilityValue={progressAccessibilityValue}
+          style={[styles.track, isOverlay && styles.overlayTrack]}
+        >
+          {progressFill}
+        </View>
+      )}
     </View>
   );
 }
@@ -178,6 +157,11 @@ const styles = StyleSheet.create({
   },
   overlayTimeText: {
     color: colors.offWhite,
+  },
+  seekTarget: {
+    justifyContent: 'center',
+    minHeight: 44,
+    width: '100%',
   },
   track: {
     backgroundColor: colors.lavenderMuted,

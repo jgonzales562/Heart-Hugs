@@ -17,9 +17,9 @@ Native development uses the EAS development profiles in `eas.json`. The app curr
 - **Today** recommends practices for a selected need, surfaces resumable activity, and provides the complete catalog.
 - **Saved** contains local bookmarks, recent activity, and completion totals.
 - **Player** owns one mounted media session at a time, restores position, supports seeking and playback speed for audio, and records completion.
-- **Settings** contains practitioner information, the complete wellness disclaimer, safety information, privacy behavior, and content status.
+- **Settings** contains app information, the complete wellness disclaimer, safety information, privacy behavior, and content status.
 
-No account is required. The state stored under `@heart-hugs/wellness-state` is versioned and contains only session IDs, preferences, playback position, and completion timestamps.
+No account is required. The unencrypted local state stored under `@heart-hugs/wellness-state` is versioned and contains session IDs, filter preferences, playback activity, completion history, and timestamped numeric mood ratings. It does not contain free-form mood reflections.
 
 ## Content contract
 
@@ -31,14 +31,13 @@ The bundled catalog is validated at startup by `src/content/sessionRepository.ts
 - display metadata, benefits, and tags; and
 - an explicit `contentStatus`.
 
-A session marked `reviewed` must also provide a review date and transcript. The current bundled sessions remain marked `prototype` because their demonstration media, practitioner identity, transcripts, and clinical review are not production-ready.
+A session marked `reviewed` must also provide a review date and transcript. The current bundled sessions remain marked `prototype` because their demonstration media, transcripts, and clinical review are not production-ready.
 
 The repository interface is intentionally independent of the bundled array. A remote manifest or CMS can replace the local source without changing screen behavior, provided it is validated before publication.
 
 ## Production release requirements
 
 - Replace all demonstration media and artwork with licensed, production-owned assets.
-- Verify practitioner identity and credentials.
 - Add complete transcripts and video captions.
 - Obtain clinical and legal review of content, claims, consent, and safety copy.
 - Localize crisis resources for supported regions.

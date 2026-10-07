@@ -1,5 +1,7 @@
 import { sessionCatalog } from '../data/sessions';
-import { Session, WellnessNeed, WellnessNeedId } from '../types/session';
+import type { Session, WellnessNeed, WellnessNeedId } from '../types/session';
+
+const sessionIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const wellnessNeeds: readonly WellnessNeed[] = [
   {
@@ -19,8 +21,8 @@ export const wellnessNeeds: readonly WellnessNeed[] = [
   },
   {
     id: 'mood-elevating-positions',
-    label: 'Mood Elevating Positions',
-    description: 'Explore supportive postures that encourage energy and emotional lift.',
+    label: 'Supportive Postures',
+    description: 'Explore comfortable postures with attention to steadiness and ease.',
   },
   {
     id: 'nature-sounds',
@@ -30,7 +32,7 @@ export const wellnessNeeds: readonly WellnessNeed[] = [
   {
     id: 'shaking',
     label: 'Shaking',
-    description: 'Move with rhythm and let stored energy travel through the body.',
+    description: 'Move with rhythm and notice how shaking feels in your body.',
   },
   {
     id: 'gentle-stretching',
@@ -39,8 +41,8 @@ export const wellnessNeeds: readonly WellnessNeed[] = [
   },
   {
     id: 'breathworks',
-    label: 'Breathworks',
-    description: 'Explore breathing rhythms that support focus and regulation.',
+    label: 'Breathwork',
+    description: 'Explore breathing rhythms while staying within your comfort.',
   },
   {
     id: 'sound-bath',
@@ -49,8 +51,8 @@ export const wellnessNeeds: readonly WellnessNeed[] = [
   },
   {
     id: 'natural-remedies',
-    label: 'Natural Remedies',
-    description: 'Reconnect with simple sensory rituals inspired by the earth.',
+    label: 'Sensory Rituals',
+    description: 'Slow down with simple sensory rituals inspired by the natural world.',
   },
   {
     id: 'nature-walk',
@@ -66,51 +68,142 @@ export const wellnessNeeds: readonly WellnessNeed[] = [
 
 export type SessionRepository = {
   getAll(): readonly Session[];
-  getById(sessionId?: string): Session | undefined;
+  getById(sessionId: string): Session | undefined;
   getDefault(): Session;
 };
 
-export function validateSessionCatalog(catalog: readonly Session[]) {
+export function validateSessionCatalog(catalog: unknown): readonly string[] {
   const issues: string[] = [];
+
+  if (!Array.isArray(catalog)) {
+    return ['Session catalog must be an array.'];
+  }
+
+  if (catalog.length === 0) {
+    issues.push('Session catalog must include at least one session.');
+  }
+
   const ids = new Set<string>();
-  const knownNeeds = new Set<WellnessNeedId>(wellnessNeeds.map((need) => need.id));
+  const knownNeeds: ReadonlySet<string> = new Set<WellnessNeedId>(
+    wellnessNeeds.map((need) => need.id)
+  );
+  let featuredSessionCount = 0;
 
-  catalog.forEach((session, index) => {
-    const label = session.id || `session at index ${index}`;
-
-    if (!session.id.trim()) {
-      issues.push(`Session at index ${index} is missing an id.`);
-    } else if (ids.has(session.id)) {
-      issues.push(`Session id "${session.id}" is duplicated.`);
+  catalog.forEach((value, index) => {
+    if (!isRecord(value)) {
+      issues.push(`Session at index ${index} must be an object.`);
+      return;
     }
 
-    ids.add(session.id);
+    const id = isNonBlankString(value.id) ? value.id : '';
+    const label = id || `Session at index ${index}`;
 
-    if (!session.title.trim() || !session.description.trim()) {
+    if (!id) {
+      issues.push(`Session at index ${index} is missing an id.`);
+    } else {
+      if (!sessionIdPattern.test(id)) {
+        issues.push(`${label} must use a lowercase, hyphen-separated id.`);
+      }
+
+      if (ids.has(id)) {
+        issues.push(`Session id "${id}" is duplicated.`);
+      }
+
+      ids.add(id);
+    }
+
+    if (
+      !isNonBlankString(value.title) ||
+      !isNonBlankString(value.description) ||
+      !isNonBlankString(value.authorName) ||
+      !isNonBlankString(value.category)
+    ) {
       issues.push(`${label} is missing required display copy.`);
     }
 
-    if (!Number.isFinite(session.durationMinutes) || session.durationMinutes <= 0) {
+    if (
+      typeof value.durationMinutes !== 'number' ||
+      !Number.isFinite(value.durationMinutes) ||
+      value.durationMinutes <= 0
+    ) {
       issues.push(`${label} has an invalid duration.`);
     }
 
-    if (!isHttpsUrl(session.mediaUrl) || !isHttpsUrl(session.thumbnailUrl)) {
+    if (value.mediaType !== 'audio' && value.mediaType !== 'video') {
+      issues.push(`${label} has an unsupported media type.`);
+    }
+
+    if (!isHttpsUrl(value.mediaUrl) || !isHttpsUrl(value.thumbnailUrl)) {
       issues.push(`${label} must use HTTPS media and artwork URLs.`);
     }
 
-    if (session.needIds.length === 0 || session.needIds.some((needId) => !knownNeeds.has(needId))) {
+    if (!isNonEmptyStringArray(value.needIds)) {
       issues.push(`${label} must reference at least one known wellness need.`);
+    } else {
+      if (value.needIds.some((needId) => !knownNeeds.has(needId))) {
+        issues.push(`${label} references an unknown wellness need.`);
+      }
+
+      if (new Set(value.needIds).size !== value.needIds.length) {
+        issues.push(`${label} contains duplicate wellness needs.`);
+      }
     }
 
-    if (session.contentStatus === 'reviewed' && (!session.reviewedAt || !session.transcript)) {
-      issues.push(`${label} must include a review date and transcript before publication.`);
+    if (!isNonEmptyStringArray(value.benefits) || !isNonEmptyStringArray(value.tags)) {
+      issues.push(`${label} must include nonempty benefits and tags.`);
+    }
+
+    if (typeof value.isFeatured !== 'boolean') {
+      issues.push(`${label} must declare whether it is featured.`);
+    } else if (value.isFeatured) {
+      featuredSessionCount += 1;
+    }
+
+    if (value.contentStatus !== 'prototype' && value.contentStatus !== 'reviewed') {
+      issues.push(`${label} has an unsupported content status.`);
+    } else if (value.contentStatus === 'reviewed') {
+      if (!isValidDate(value.reviewedAt) || !isNonBlankString(value.transcript)) {
+        issues.push(`${label} must include a valid review date and transcript before publication.`);
+      }
+    } else {
+      if (value.reviewedAt !== undefined) {
+        issues.push(`${label} cannot include a review date while marked as prototype content.`);
+      }
+
+      if (value.transcript !== undefined && !isNonBlankString(value.transcript)) {
+        issues.push(`${label} has an invalid prototype transcript.`);
+      }
     }
   });
+
+  if (featuredSessionCount !== 1) {
+    issues.push('Session catalog must include exactly one featured session.');
+  }
 
   return issues;
 }
 
-function isHttpsUrl(value: string) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isNonEmptyStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.every(isNonBlankString);
+}
+
+function isValidDate(value: unknown): value is string {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
+function isHttpsUrl(value: unknown) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
   try {
     return new URL(value).protocol === 'https:';
   } catch {
@@ -125,17 +218,14 @@ if (validationIssues.length > 0) {
 }
 
 const sessionsById = new Map(sessionCatalog.map((session) => [session.id, session]));
+const defaultSession = sessionCatalog.find((session) => session.isFeatured);
+
+if (!defaultSession) {
+  throw new Error('Heart Hugs requires one featured catalog session.');
+}
 
 export const sessionRepository: SessionRepository = {
   getAll: () => sessionCatalog,
-  getById: (sessionId) => (sessionId ? sessionsById.get(sessionId) : undefined),
-  getDefault: () => {
-    const defaultSession = sessionCatalog.find((session) => session.isFeatured) ?? sessionCatalog[0];
-
-    if (!defaultSession) {
-      throw new Error('Heart Hugs requires at least one published session.');
-    }
-
-    return defaultSession;
-  },
+  getById: (sessionId) => sessionsById.get(sessionId),
+  getDefault: () => defaultSession,
 };

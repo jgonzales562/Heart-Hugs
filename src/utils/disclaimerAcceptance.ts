@@ -1,23 +1,34 @@
 export type DisclaimerAcceptance = {
-  acceptedAt: string;
-  version: string;
+  readonly acceptedAt: string;
+  readonly version: string;
 };
 
 export function createDisclaimerAcceptance(
   version: string,
   acceptedAt = new Date()
 ): DisclaimerAcceptance {
+  if (!isValidVersion(version)) {
+    throw new TypeError('Disclaimer version must not be blank.');
+  }
+
   return {
     acceptedAt: acceptedAt.toISOString(),
     version,
   };
 }
 
-export function serializeDisclaimerAcceptance(acceptance: DisclaimerAcceptance) {
+export function serializeDisclaimerAcceptance(acceptance: DisclaimerAcceptance): string {
   return JSON.stringify(acceptance);
 }
 
-export function hasAcceptedDisclaimerVersion(rawValue: string | null, currentVersion: string) {
+export function hasAcceptedDisclaimerVersion(
+  rawValue: string | null,
+  currentVersion: string
+): boolean {
+  if (!isValidVersion(currentVersion)) {
+    return false;
+  }
+
   if (isLegacyDisclaimerAcceptance(rawValue)) {
     return true;
   }
@@ -39,7 +50,7 @@ export function hasAcceptedDisclaimerVersion(rawValue: string | null, currentVer
   }
 }
 
-export function isLegacyDisclaimerAcceptance(rawValue: string | null) {
+export function isLegacyDisclaimerAcceptance(rawValue: string | null): boolean {
   return rawValue === 'true';
 }
 
@@ -51,8 +62,18 @@ function isDisclaimerAcceptance(value: unknown): value is DisclaimerAcceptance {
   const acceptance = value as Partial<DisclaimerAcceptance>;
 
   return (
-    typeof acceptance.version === 'string' &&
+    isValidVersion(acceptance.version) &&
     typeof acceptance.acceptedAt === 'string' &&
-    !Number.isNaN(Date.parse(acceptance.acceptedAt))
+    isCanonicalIsoTimestamp(acceptance.acceptedAt)
   );
+}
+
+function isValidVersion(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isCanonicalIsoTimestamp(value: string): boolean {
+  const parsedDate = new Date(value);
+
+  return !Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString() === value;
 }

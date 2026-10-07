@@ -2,12 +2,11 @@ import { setAudioModeAsync } from 'expo-audio';
 
 import { PlaybackCoordinator } from '../utils/PlaybackCoordinator';
 
-async function configureBackgroundAudio(enabled: boolean) {
+async function configureBackgroundAudio(enabled: boolean): Promise<boolean> {
   try {
     await setAudioModeAsync({
       allowsRecording: false,
       interruptionMode: 'doNotMix',
-      interruptionModeAndroid: 'doNotMix',
       playsInSilentMode: true,
       shouldPlayInBackground: enabled,
       shouldRouteThroughEarpiece: false,

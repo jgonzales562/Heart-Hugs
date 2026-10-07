@@ -2,8 +2,8 @@ export type PlaybackKind = 'audio' | 'video';
 
 type ConfigureBackgroundAudio = (enabled: boolean) => Promise<boolean>;
 type PlaybackRegistration = {
-  kind: PlaybackKind;
-  pause: () => void;
+  readonly kind: PlaybackKind;
+  readonly pause: () => void;
 };
 
 /**
@@ -19,7 +19,17 @@ export class PlaybackCoordinator {
 
   constructor(private readonly configureBackgroundAudio: ConfigureBackgroundAudio) {}
 
-  register(id: string, registration: PlaybackRegistration) {
+  register(id: string, registration: PlaybackRegistration): () => void {
+    const previousRegistration = this.registrations.get(id);
+
+    if (previousRegistration && previousRegistration !== registration) {
+      if (this.desiredPlaybackId === id) {
+        this.pauseRegistration(id, previousRegistration);
+        this.desiredPlaybackId = null;
+        void this.enqueue(() => this.releaseBackgroundAudioWhenUnused());
+      }
+    }
+
     this.registrations.set(id, registration);
 
     return () => {
@@ -27,12 +37,12 @@ export class PlaybackCoordinator {
         return;
       }
 
-      this.registrations.delete(id);
-
       if (this.desiredPlaybackId === id) {
+        this.pauseRegistration(id, registration);
         this.desiredPlaybackId = null;
       }
 
+      this.registrations.delete(id);
       void this.enqueue(() => this.releaseBackgroundAudioWhenUnused());
     };
   }
@@ -56,9 +66,8 @@ export class PlaybackCoordinator {
 
       if (registration.kind === 'audio') {
         if (!this.backgroundAudioEnabled) {
-          this.backgroundAudioEnabled = await this.configureBackgroundAudio(true);
+          this.backgroundAudioEnabled = await this.tryConfigureBackgroundAudio(true);
         }
-
       } else {
         await this.disableBackgroundAudio();
       }
@@ -71,7 +80,10 @@ export class PlaybackCoordinator {
         play();
         return true;
       } catch (error) {
-        this.desiredPlaybackId = null;
+        if (this.desiredPlaybackId === id) {
+          this.desiredPlaybackId = null;
+        }
+
         await this.releaseBackgroundAudioWhenUnused();
         throw error;
       }
@@ -79,10 +91,10 @@ export class PlaybackCoordinator {
   }
 
   stop(id: string): Promise<void> {
-    try {
-      this.registrations.get(id)?.pause();
-    } catch (error) {
-      console.warn(`Unable to stop ${id}.`, error);
+    const registration = this.registrations.get(id);
+
+    if (registration) {
+      this.pauseRegistration(id, registration);
     }
 
     if (this.desiredPlaybackId === id) {
@@ -110,21 +122,25 @@ export class PlaybackCoordinator {
     return result;
   }
 
-  private pauseOtherPlayers(activePlaybackId: string) {
+  private pauseOtherPlayers(activePlaybackId: string): void {
     this.registrations.forEach((registration, playbackId) => {
       if (playbackId === activePlaybackId) {
         return;
       }
 
-      try {
-        registration.pause();
-      } catch (error) {
-        console.warn(`Unable to pause ${playbackId}.`, error);
-      }
+      this.pauseRegistration(playbackId, registration);
     });
   }
 
-  private async releaseBackgroundAudioWhenUnused() {
+  private pauseRegistration(id: string, registration: PlaybackRegistration): void {
+    try {
+      registration.pause();
+    } catch (error) {
+      console.warn(`Unable to pause ${id}.`, error);
+    }
+  }
+
+  private async releaseBackgroundAudioWhenUnused(): Promise<void> {
     const desiredRegistration = this.desiredPlaybackId
       ? this.registrations.get(this.desiredPlaybackId)
       : undefined;
@@ -135,15 +151,27 @@ export class PlaybackCoordinator {
     }
   }
 
-  private async disableBackgroundAudio() {
+  private async disableBackgroundAudio(): Promise<void> {
     if (!this.backgroundAudioEnabled) {
       return;
     }
 
-    const wasDisabled = await this.configureBackgroundAudio(false);
+    const wasDisabled = await this.tryConfigureBackgroundAudio(false);
 
     if (wasDisabled) {
       this.backgroundAudioEnabled = false;
+    }
+  }
+
+  private async tryConfigureBackgroundAudio(enabled: boolean): Promise<boolean> {
+    try {
+      return await this.configureBackgroundAudio(enabled);
+    } catch (error) {
+      console.warn(
+        `Unable to ${enabled ? 'enable' : 'disable'} background audio playback.`,
+        error
+      );
+      return false;
     }
   }
 }

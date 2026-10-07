@@ -1,184 +1,211 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { BookHeart, CalendarHeart, Settings } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { memo, type ReactElement } from 'react';
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
 
 import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
-import { getMoodDescriptor } from '../components/MoodThermometer';
 import { useWellness } from '../state/WellnessProvider';
 import type { MoodCheckIn } from '../state/wellnessState';
 import { colors, theme } from '../theme';
 import type { MainTabScreenProps } from '../types/navigation';
+import {
+  formatCheckInDateTime,
+  getMoodBand,
+  getMoodDescriptor,
+  normalizeMoodScore,
+  type MoodBand,
+} from '../utils/mood';
 
-export function CheckInsScreen({ navigation }: MainTabScreenProps<'CheckIns'>) {
+const METER_GRADIENT = [colors.violetDeep, colors.hotPink, colors.sunshine] as const;
+const GRADIENT_START = { x: 0, y: 0 } as const;
+const HORIZONTAL_GRADIENT_END = { x: 1, y: 0 } as const;
+const CHECK_IN_GRADIENTS: Readonly<Record<MoodBand, readonly [string, string]>> = {
+  bright: [colors.sunshineSoft, colors.vitalitySoft],
+  good: [colors.tealMist, colors.mintSoft],
+  low: [colors.roseSoft, colors.peachSoft],
+  middle: [colors.peachSoft, colors.sunshineSoft],
+  'very-low': [colors.lavender, colors.lavenderSoft],
+};
+
+export function CheckInsScreen({
+  navigation,
+}: MainTabScreenProps<'CheckIns'>): ReactElement {
   const { state } = useWellness();
   const checkIns = state.moodCheckIns;
-  const reflectionCount = checkIns.filter((checkIn) => Boolean(checkIn.note)).length;
 
   return (
-    <GradientScreen contentContainerStyle={styles.screen} scroll>
-      <View style={styles.topBar}>
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>MOOD HISTORY</Text>
-          <Text style={styles.title}>Your emotional check-ins</Text>
-        </View>
-        <BreathingPressable
-          accessibilityLabel="Open settings and safety information"
-          accessibilityRole="button"
-          onPress={() => navigation.navigate('Settings')}
-          style={styles.iconButton}
-        >
-          <Settings color={colors.textPrimary} size={21} />
-        </BreathingPressable>
-      </View>
-
-      <View style={styles.summaryRow}>
-        <SummaryCard label="Check-ins" value={checkIns.length} />
-        <SummaryCard label="Reflections" value={reflectionCount} />
-      </View>
-
-      {checkIns.length === 0 ? (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIcon}>
-            <CalendarHeart color={colors.magentaDeep} size={29} />
+    <GradientScreen contentContainerStyle={styles.screen}>
+      <FlatList
+        contentContainerStyle={styles.listContent}
+        data={checkIns}
+        initialNumToRender={8}
+        ItemSeparatorComponent={CheckInSeparator}
+        keyExtractor={getCheckInKey}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <View accessible={false} style={styles.emptyIcon}>
+              <CalendarHeart accessible={false} color={colors.magentaDeep} size={29} />
+            </View>
+            <Text accessibilityRole="header" style={styles.emptyTitle}>
+              Your check-ins will appear here
+            </Text>
+            <Text style={styles.emptyText}>
+              Use the mood thermometer on Today to record how you feel.
+            </Text>
+            <BreathingPressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('Today')}
+              style={styles.checkInButton}
+            >
+              <BookHeart accessible={false} color={colors.navy} size={18} />
+              <Text style={styles.checkInButtonText}>Start a check-in</Text>
+            </BreathingPressable>
           </View>
-          <Text style={styles.emptyTitle}>Your check-ins will appear here</Text>
-          <Text style={styles.emptyText}>
-            Use the mood thermometer on Today to record how you feel and add an optional
-            reflection.
-          </Text>
-          <BreathingPressable
-            accessibilityRole="button"
-            onPress={() => navigation.navigate('Today')}
-            style={styles.checkInButton}
+        }
+        ListHeaderComponent={
+          <View
+            style={[
+              styles.listHeader,
+              checkIns.length === 0
+                ? styles.listHeaderBeforeEmpty
+                : styles.listHeaderBeforeHistory,
+            ]}
           >
-            <BookHeart color={colors.navy} size={18} />
-            <Text style={styles.checkInButtonText}>Start a check-in</Text>
-          </BreathingPressable>
-        </View>
-      ) : (
-        <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>Most recent first</Text>
-          <View style={styles.checkInList}>
-            {checkIns.map((checkIn) => (
-              <CheckInCard checkIn={checkIn} key={checkIn.id} />
-            ))}
+            <View style={styles.topBar}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.eyebrow}>MOOD HISTORY</Text>
+                <Text accessibilityRole="header" style={styles.title}>
+                  Your emotional check-ins
+                </Text>
+              </View>
+              <BreathingPressable
+                accessibilityLabel="Open settings and safety information"
+                accessibilityRole="button"
+                onPress={() => navigation.navigate('Settings')}
+                style={styles.iconButton}
+              >
+                <Settings accessible={false} color={colors.textPrimary} size={21} />
+              </BreathingPressable>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <SummaryCard label="Check-ins" value={checkIns.length} />
+              <SummaryCard label="Latest score" value={checkIns[0]?.value ?? '—'} />
+            </View>
+
+            {checkIns.length > 0 ? (
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                Most recent first
+              </Text>
+            ) : null}
           </View>
-        </View>
-      )}
+        }
+        renderItem={renderCheckIn}
+        showsVerticalScrollIndicator={false}
+        style={styles.list}
+        windowSize={7}
+      />
     </GradientScreen>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+type SummaryCardProps = {
+  readonly label: string;
+  readonly value: number | string;
+};
+
+function SummaryCard({ label, value }: SummaryCardProps): ReactElement {
   return (
-    <View style={styles.summaryCard}>
+    <View accessible accessibilityLabel={`${label}: ${value}`} style={styles.summaryCard}>
       <Text style={styles.summaryValue}>{value}</Text>
       <Text style={styles.summaryLabel}>{label}</Text>
     </View>
   );
 }
 
-function CheckInCard({ checkIn }: { checkIn: MoodCheckIn }) {
-  const descriptor = getMoodDescriptor(checkIn.value);
-  const cardColors = getCheckInColors(checkIn.value);
+type CheckInCardProps = {
+  readonly checkIn: MoodCheckIn;
+};
+
+const CheckInCard = memo(function CheckInCard({
+  checkIn,
+}: CheckInCardProps): ReactElement {
+  const value = normalizeMoodScore(checkIn.value);
+  const descriptor = getMoodDescriptor(value);
+  const formattedDate = formatCheckInDateTime(checkIn.recordedAt);
+  const cardColors = CHECK_IN_GRADIENTS[getMoodBand(value)];
+  const meterWidth = `${value}%` as `${number}%`;
 
   return (
     <LinearGradient
-      accessibilityLabel={`${descriptor.label}, ${checkIn.value} out of 100, ${formatCheckInDateTime(checkIn.recordedAt)}${checkIn.note ? `, reflection: ${checkIn.note}` : ''}`}
+      accessible
+      accessibilityLabel={`${descriptor.label}, ${value} out of 100, ${formattedDate}`}
       colors={cardColors}
       style={styles.checkInCard}
     >
       <View style={styles.checkInHeader}>
         <View style={styles.checkInCopy}>
           <Text style={styles.moodLabel}>{descriptor.label}</Text>
-          <Text style={styles.dateText}>{formatCheckInDateTime(checkIn.recordedAt)}</Text>
+          <Text style={styles.dateText}>{formattedDate}</Text>
         </View>
         <View style={styles.scoreBadge}>
-          <Text style={styles.scoreValue}>{checkIn.value}</Text>
+          <Text style={styles.scoreValue}>{value}</Text>
           <Text style={styles.scoreRange}>/100</Text>
         </View>
       </View>
 
-      <View style={styles.meterTrack}>
+      <View accessible={false} style={styles.meterTrack}>
         <LinearGradient
-          colors={[colors.violetDeep, colors.hotPink, colors.sunshine]}
-          end={{ x: 1, y: 0 }}
-          start={{ x: 0, y: 0 }}
-          style={[styles.meterFill, { width: `${checkIn.value}%` }]}
+          colors={METER_GRADIENT}
+          end={HORIZONTAL_GRADIENT_END}
+          start={GRADIENT_START}
+          style={[styles.meterFill, { width: meterWidth }]}
         />
       </View>
-
-      {checkIn.note ? (
-        <View style={styles.reflection}>
-          <Text style={styles.reflectionLabel}>REFLECTION</Text>
-          <Text style={styles.reflectionText}>{checkIn.note}</Text>
-        </View>
-      ) : (
-        <Text style={styles.noReflection}>No reflection added.</Text>
-      )}
     </LinearGradient>
   );
+});
+
+function renderCheckIn({ item }: ListRenderItemInfo<MoodCheckIn>): ReactElement {
+  return <CheckInCard checkIn={item} />;
 }
 
-function getCheckInColors(value: number): readonly [string, string] {
-  if (value <= 20) {
-    return [colors.lavender, colors.lavenderSoft];
-  }
-
-  if (value <= 40) {
-    return [colors.roseSoft, colors.peachSoft];
-  }
-
-  if (value <= 60) {
-    return [colors.peachSoft, colors.sunshineSoft];
-  }
-
-  if (value <= 80) {
-    return [colors.tealMist, colors.mintSoft];
-  }
-
-  return [colors.sunshineSoft, colors.vitalitySoft];
+function getCheckInKey(checkIn: MoodCheckIn): string {
+  return checkIn.id;
 }
 
-function formatCheckInDateTime(recordedAt: string) {
-  const date = new Date(recordedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Recently';
-  }
-
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  const dayLabel = isSameCalendarDay(date, today)
-    ? 'Today'
-    : isSameCalendarDay(date, yesterday)
-      ? 'Yesterday'
-      : date.toLocaleDateString([], {
-          day: 'numeric',
-          month: 'short',
-          year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric',
-        });
-  const timeLabel = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-
-  return `${dayLabel} · ${timeLabel}`;
-}
-
-function isSameCalendarDay(left: Date, right: Date) {
-  return (
-    left.getFullYear() === right.getFullYear() &&
-    left.getMonth() === right.getMonth() &&
-    left.getDate() === right.getDate()
-  );
+function CheckInSeparator(): ReactElement {
+  return <View style={styles.checkInSeparator} />;
 }
 
 const styles = StyleSheet.create({
   screen: {
-    gap: theme.spacing.xl,
-    paddingBottom: 116,
+    flex: 1,
+    paddingBottom: 0,
     paddingTop: theme.spacing.sm,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    flexGrow: 1,
+    paddingBottom: 116,
+  },
+  listHeader: {
+    gap: theme.spacing.xl,
+  },
+  listHeaderBeforeEmpty: {
+    marginBottom: theme.spacing.xl,
+  },
+  listHeaderBeforeHistory: {
+    marginBottom: theme.spacing.md,
   },
   topBar: {
     alignItems: 'flex-start',
@@ -284,17 +311,14 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.sm,
   },
-  historySection: {
-    gap: theme.spacing.md,
-  },
   sectionTitle: {
     color: colors.textPrimary,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xl,
     lineHeight: theme.typography.lineHeight.xl,
   },
-  checkInList: {
-    gap: theme.spacing.md,
+  checkInSeparator: {
+    height: theme.spacing.md,
   },
   checkInCard: {
     borderColor: colors.border,
@@ -356,27 +380,5 @@ const styles = StyleSheet.create({
   meterFill: {
     borderRadius: theme.radius.full,
     height: '100%',
-  },
-  reflection: {
-    gap: theme.spacing.xxs,
-  },
-  reflectionLabel: {
-    color: colors.magentaDeep,
-    fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: theme.typography.size.xs,
-    letterSpacing: 1.2,
-    lineHeight: theme.typography.lineHeight.sm,
-  },
-  reflectionText: {
-    color: colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.regular,
-    fontSize: theme.typography.size.md,
-    lineHeight: theme.typography.lineHeight.md,
-  },
-  noReflection: {
-    color: colors.textSecondary,
-    fontFamily: theme.typography.fontFamily.regular,
-    fontSize: theme.typography.size.sm,
-    fontStyle: 'italic',
   },
 });

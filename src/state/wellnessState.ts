@@ -1,34 +1,40 @@
-import { WellnessNeedId } from '../types/session';
+import { WELLNESS_NEED_IDS } from '../types/session';
+import type { WellnessNeedId } from '../types/session';
+import { clampMoodValue } from '../utils/mood';
 
-export const WELLNESS_STATE_VERSION = 1;
+const LEGACY_WELLNESS_STATE_VERSION = 1;
+const MAX_MOOD_CHECK_INS = 100;
+const defaultNeedPreference: WellnessNeedId = 'grounding';
+const wellnessNeedIds: ReadonlySet<unknown> = new Set(WELLNESS_NEED_IDS);
+
+export const WELLNESS_STATE_VERSION = 2;
 
 export type SessionActivity = {
-  completionCount: number;
-  durationSeconds: number;
-  lastCompletedAt?: string;
-  lastPlayedAt: string;
-  positionSeconds: number;
+  readonly completionCount: number;
+  readonly durationSeconds: number;
+  readonly lastCompletedAt?: string;
+  readonly lastPlayedAt: string;
+  readonly positionSeconds: number;
 };
 
 export type MoodCheckIn = {
-  id: string;
-  note?: string;
-  recordedAt: string;
-  value: number;
+  readonly id: string;
+  readonly recordedAt: string;
+  readonly value: number;
 };
 
 export type WellnessState = {
-  activityBySessionId: Record<string, SessionActivity>;
-  moodCheckIns: MoodCheckIn[];
-  needPreference: WellnessNeedId;
-  savedSessionIds: string[];
-  version: typeof WELLNESS_STATE_VERSION;
+  readonly activityBySessionId: Readonly<Record<string, SessionActivity>>;
+  readonly moodCheckIns: readonly MoodCheckIn[];
+  readonly needPreference: WellnessNeedId;
+  readonly savedSessionIds: readonly string[];
+  readonly version: typeof WELLNESS_STATE_VERSION;
 };
 
 export const initialWellnessState: WellnessState = {
   activityBySessionId: {},
   moodCheckIns: [],
-  needPreference: 'grounding',
+  needPreference: defaultNeedPreference,
   savedSessionIds: [],
   version: WELLNESS_STATE_VERSION,
 };
@@ -44,24 +50,28 @@ export function parseWellnessState(
   try {
     const value: unknown = JSON.parse(rawValue);
 
-    if (!isObject(value) || value.version !== WELLNESS_STATE_VERSION) {
+    if (
+      !isObject(value) ||
+      (value.version !== LEGACY_WELLNESS_STATE_VERSION &&
+        value.version !== WELLNESS_STATE_VERSION)
+    ) {
       return initialWellnessState;
     }
 
-    const validIds = new Set(validSessionIds);
+    const validIds: ReadonlySet<string> = new Set(validSessionIds);
     const savedSessionIds = Array.isArray(value.savedSessionIds)
       ? value.savedSessionIds.filter(
           (sessionId): sessionId is string =>
             typeof sessionId === 'string' && validIds.has(sessionId)
         )
       : [];
-    const activityBySessionId = parseActivity(value.activityBySessionId, validIds);
-    const moodCheckIns = parseMoodCheckIns(value.moodCheckIns);
-    const needPreference = isNeedId(value.needPreference) ? value.needPreference : 'grounding';
+
     return {
-      activityBySessionId,
-      moodCheckIns,
-      needPreference,
+      activityBySessionId: parseActivity(value.activityBySessionId, validIds),
+      moodCheckIns: parseMoodCheckIns(value.moodCheckIns),
+      needPreference: isNeedId(value.needPreference)
+        ? value.needPreference
+        : defaultNeedPreference,
       savedSessionIds: Array.from(new Set(savedSessionIds)),
       version: WELLNESS_STATE_VERSION,
     };
@@ -73,21 +83,19 @@ export function parseWellnessState(
 export function recordMoodCheckIn(
   state: WellnessState,
   value: number,
-  note = '',
   occurredAt = new Date()
 ): WellnessState {
   const recordedAt = occurredAt.toISOString();
-  const safeNote = sanitizeMoodNote(note);
+  const safeValue = Math.round(clampMoodValue(value));
   const moodCheckIn: MoodCheckIn = {
-    id: `${recordedAt}-${Math.round(clampMoodValue(value))}`,
-    ...(safeNote ? { note: safeNote } : {}),
+    id: createMoodCheckInId(state.moodCheckIns, recordedAt, safeValue),
     recordedAt,
-    value: Math.round(clampMoodValue(value)),
+    value: safeValue,
   };
 
   return {
     ...state,
-    moodCheckIns: [moodCheckIn, ...state.moodCheckIns].slice(0, 100),
+    moodCheckIns: [moodCheckIn, ...state.moodCheckIns].slice(0, MAX_MOOD_CHECK_INS),
   };
 }
 
@@ -98,8 +106,8 @@ export function isSessionResumable(
     return false;
   }
 
-  const position = finitePositive(activity.positionSeconds);
-  const duration = finitePositive(activity.durationSeconds);
+  const position = toNonNegativeFinite(activity.positionSeconds);
+  const duration = toNonNegativeFinite(activity.durationSeconds);
 
   return position > 0 && (duration === 0 || position < duration);
 }
@@ -129,7 +137,9 @@ export function recordSessionOpened(
       [sessionId]: {
         completionCount: existingActivity?.completionCount ?? 0,
         durationSeconds: existingActivity?.durationSeconds ?? 0,
-        lastCompletedAt: existingActivity?.lastCompletedAt,
+        ...(existingActivity?.lastCompletedAt
+          ? { lastCompletedAt: existingActivity.lastCompletedAt }
+          : {}),
         lastPlayedAt: occurredAt.toISOString(),
         positionSeconds: existingActivity?.positionSeconds ?? 0,
       },
@@ -144,9 +154,8 @@ export function recordPlaybackProgress(
   durationSeconds: number
 ): WellnessState {
   const existingActivity = state.activityBySessionId[sessionId];
-  const safeDuration = finitePositive(durationSeconds);
-  const safePosition = Math.min(finitePositive(positionSeconds), safeDuration || Number.MAX_VALUE);
-  const resumablePosition = safeDuration > 0 && safePosition >= safeDuration - 1 ? 0 : safePosition;
+  const safeDuration = toNonNegativeFinite(durationSeconds);
+  const resumablePosition = normalizePlaybackPosition(positionSeconds, safeDuration);
 
   if (
     existingActivity &&
@@ -163,7 +172,9 @@ export function recordPlaybackProgress(
       [sessionId]: {
         completionCount: existingActivity?.completionCount ?? 0,
         durationSeconds: safeDuration,
-        lastCompletedAt: existingActivity?.lastCompletedAt,
+        ...(existingActivity?.lastCompletedAt
+          ? { lastCompletedAt: existingActivity.lastCompletedAt }
+          : {}),
         lastPlayedAt: existingActivity?.lastPlayedAt ?? new Date().toISOString(),
         positionSeconds: resumablePosition,
       },
@@ -177,110 +188,146 @@ export function recordSessionCompleted(
   occurredAt = new Date()
 ): WellnessState {
   const existingActivity = state.activityBySessionId[sessionId];
+  const completedAt = occurredAt.toISOString();
 
   return {
     ...state,
     activityBySessionId: {
       ...state.activityBySessionId,
       [sessionId]: {
-        completionCount: (existingActivity?.completionCount ?? 0) + 1,
+        completionCount: toNonNegativeInteger(existingActivity?.completionCount) + 1,
         durationSeconds: existingActivity?.durationSeconds ?? 0,
-        lastCompletedAt: occurredAt.toISOString(),
-        lastPlayedAt: occurredAt.toISOString(),
+        lastCompletedAt: completedAt,
+        lastPlayedAt: completedAt,
         positionSeconds: 0,
       },
     },
   };
 }
 
-function parseActivity(value: unknown, validIds: Set<string>) {
+function parseActivity(
+  value: unknown,
+  validIds: ReadonlySet<string>
+): Record<string, SessionActivity> {
   if (!isObject(value)) {
     return {};
   }
 
-  return Object.entries(value).reduce<Record<string, SessionActivity>>((activity, [sessionId, entry]) => {
-    if (!validIds.has(sessionId) || !isObject(entry) || typeof entry.lastPlayedAt !== 'string') {
+  return Object.entries(value).reduce<Record<string, SessionActivity>>(
+    (activity, [sessionId, entry]) => {
+      if (!validIds.has(sessionId) || !isObject(entry) || !isValidDate(entry.lastPlayedAt)) {
+        return activity;
+      }
+
+      const durationSeconds = toNonNegativeFinite(entry.durationSeconds);
+      const lastCompletedAt = isValidDate(entry.lastCompletedAt)
+        ? entry.lastCompletedAt
+        : undefined;
+
+      activity[sessionId] = {
+        completionCount: toNonNegativeInteger(entry.completionCount),
+        durationSeconds,
+        ...(lastCompletedAt ? { lastCompletedAt } : {}),
+        lastPlayedAt: entry.lastPlayedAt,
+        positionSeconds: normalizePlaybackPosition(entry.positionSeconds, durationSeconds),
+      };
+
       return activity;
-    }
-
-    const lastPlayedAt = Date.parse(entry.lastPlayedAt);
-
-    if (Number.isNaN(lastPlayedAt)) {
-      return activity;
-    }
-
-    activity[sessionId] = {
-      completionCount: finitePositive(entry.completionCount),
-      durationSeconds: finitePositive(entry.durationSeconds),
-      lastCompletedAt:
-        typeof entry.lastCompletedAt === 'string' && !Number.isNaN(Date.parse(entry.lastCompletedAt))
-          ? entry.lastCompletedAt
-          : undefined,
-      lastPlayedAt: entry.lastPlayedAt,
-      positionSeconds: finitePositive(entry.positionSeconds),
-    };
-
-    return activity;
-  }, {});
+    },
+    {}
+  );
 }
 
-function parseMoodCheckIns(value: unknown): MoodCheckIn[] {
+function parseMoodCheckIns(value: unknown): readonly MoodCheckIn[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  return value
-    .filter(
-      (entry): entry is Record<string, unknown> =>
-        isObject(entry) &&
-        typeof entry.id === 'string' &&
-        typeof entry.recordedAt === 'string' &&
-        !Number.isNaN(Date.parse(entry.recordedAt)) &&
-        typeof entry.value === 'number' &&
-        Number.isFinite(entry.value) &&
-        entry.value >= 0 &&
-        entry.value <= 100
-    )
-    .map((entry) => {
-      const note = typeof entry.note === 'string' ? sanitizeMoodNote(entry.note) : '';
+  const checkIns: MoodCheckIn[] = [];
 
-      return {
-        id: entry.id as string,
-        ...(note ? { note } : {}),
-        recordedAt: entry.recordedAt as string,
-        value: Math.round(entry.value as number),
-      };
+  value.forEach((entry) => {
+    if (
+      !isObject(entry) ||
+      !isNonBlankString(entry.id) ||
+      !isValidDate(entry.recordedAt) ||
+      typeof entry.value !== 'number' ||
+      !Number.isFinite(entry.value) ||
+      entry.value < 0 ||
+      entry.value > 100
+    ) {
+      return;
+    }
+
+    checkIns.push({
+      id: entry.id,
+      recordedAt: entry.recordedAt,
+      value: Math.round(entry.value),
+    });
+  });
+
+  const seenIds = new Set<string>();
+
+  return checkIns
+    .sort((left, right) => Date.parse(right.recordedAt) - Date.parse(left.recordedAt))
+    .filter((checkIn) => {
+      if (seenIds.has(checkIn.id)) {
+        return false;
+      }
+
+      seenIds.add(checkIn.id);
+      return true;
     })
-    .slice(0, 100);
+    .slice(0, MAX_MOOD_CHECK_INS);
 }
 
-function sanitizeMoodNote(note: string) {
-  return note.trim().slice(0, 280);
+function createMoodCheckInId(
+  checkIns: readonly MoodCheckIn[],
+  recordedAt: string,
+  value: number
+) {
+  const baseId = `${recordedAt}-${value}`;
+  const existingIds = new Set(checkIns.map((checkIn) => checkIn.id));
+
+  if (!existingIds.has(baseId)) {
+    return baseId;
+  }
+
+  let suffix = 2;
+
+  while (existingIds.has(`${baseId}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${baseId}-${suffix}`;
 }
 
-function clampMoodValue(value: number) {
-  return Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 50;
+function normalizePlaybackPosition(value: unknown, durationSeconds: number) {
+  const positionSeconds = Math.min(
+    toNonNegativeFinite(value),
+    durationSeconds || Number.MAX_VALUE
+  );
+
+  return durationSeconds > 0 && positionSeconds >= durationSeconds - 1 ? 0 : positionSeconds;
 }
 
 function isNeedId(value: unknown): value is WellnessNeedId {
-  return (
-    value === 'grounding' ||
-    value === 'guided-imagery' ||
-    value === 'mindfulness' ||
-    value === 'mood-elevating-positions' ||
-    value === 'nature-sounds' ||
-    value === 'shaking' ||
-    value === 'gentle-stretching' ||
-    value === 'breathworks' ||
-    value === 'sound-bath' ||
-    value === 'natural-remedies' ||
-    value === 'nature-walk' ||
-    value === 'manifestation'
-  );
+  return wellnessNeedIds.has(value);
 }
 
-function finitePositive(value: unknown) {
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidDate(value: unknown): value is string {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}
+
+function toNonNegativeFinite(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function toNonNegativeInteger(value: unknown) {
+  return Math.floor(toNonNegativeFinite(value));
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

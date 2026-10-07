@@ -4,15 +4,20 @@ import { useAudioPlayerStatus, type AudioPlayer } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer, type VideoPlayerStatus } from 'expo-video';
 import { AlertCircle, FastForward, Rewind, RotateCcw } from 'lucide-react-native';
-import { ReactNode, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
 
 import { BreathingPressable } from './BreathingPressable';
-import {
-  PlaybackProgress,
-  getPlaybackProgress,
-  sanitizePlaybackTime,
-} from './PlaybackProgress';
+import { PlaybackProgress } from './PlaybackProgress';
 import { PlaybackToggle } from './PlaybackToggle';
 import { playbackCoordinator } from '../services/playback';
 import {
@@ -20,19 +25,31 @@ import {
   PERSISTENT_AUDIO_PLAYBACK_ID,
 } from '../services/persistentAudio';
 import { colors, gradients, theme } from '../theme';
-import { Session } from '../types/session';
-import { PlaybackKind } from '../utils/PlaybackCoordinator';
+import type { Session } from '../types/session';
+import type { PlaybackKind } from '../utils/PlaybackCoordinator';
+import {
+  getNextAudioPlaybackRate,
+  getRetryRestorePosition,
+  getSupportedAudioPlaybackRate,
+  runPlaybackCompletion,
+  shouldRestorePlaybackPosition,
+} from '../utils/mediaPlayback';
+import { sanitizePlaybackTime } from '../utils/playbackProgress';
 
 type MediaPlayerProps = {
-  initialPosition?: number;
-  onComplete?: () => void;
-  onPause?: (currentTime: number, duration: number) => void;
-  onProgress?: (currentTime: number, duration: number) => void;
-  session: Session;
+  readonly initialPosition?: number;
+  readonly onComplete?: () => void;
+  readonly onPause?: (currentTime: number, duration: number) => void;
+  readonly onProgress?: (currentTime: number, duration: number) => void;
+  readonly session: Session;
 };
 
 const MEDIA_LOAD_TIMEOUT_MS = 15_000;
 const AUDIO_LOADING_MESSAGE_DELAY_MS = 2_000;
+const VIDEO_CONTROL_GRADIENT = [
+  'rgba(23, 42, 68, 0)',
+  'rgba(23, 42, 68, 0.72)',
+] as const;
 
 function usePlaybackInstanceId(): string {
   return `media-player-${useId()}`;
@@ -42,7 +59,7 @@ function useRegisteredPlaybackPauser(
   playbackId: string,
   kind: PlaybackKind,
   pausePlayback: () => void
-) {
+): void {
   const onPausePlayback = useEffectEvent(pausePlayback);
 
   useEffect(() => {
@@ -53,12 +70,24 @@ function useRegisteredPlaybackPauser(
   }, [kind, playbackId]);
 }
 
-function configureAudioPlayer(player: AudioPlayer) {
+function configureAudioPlayer(player: AudioPlayer): void {
   player.loop = false;
   player.volume = 0.86;
 }
 
-export function MediaPlayer(props: MediaPlayerProps) {
+function completePlayback(
+  playbackId: string,
+  sessionTitle: string,
+  reportCompletion: () => void
+): void {
+  void runPlaybackCompletion(
+    () => playbackCoordinator.finish(playbackId),
+    reportCompletion,
+    (error) => console.warn(`Unable to finish ${sessionTitle}.`, error)
+  );
+}
+
+export function MediaPlayer(props: MediaPlayerProps): ReactElement {
   if (props.session.mediaType === 'video') {
     return <VideoSessionPlayer {...props} />;
   }
@@ -72,16 +101,16 @@ function AudioSessionPlayer({
   onPause,
   onProgress,
   session,
-}: MediaPlayerProps) {
-  const [{ player, shouldRestorePosition }] = useState(() =>
+}: MediaPlayerProps): ReactElement {
+  const [player] = useState(() =>
     getPersistentAudioPlayer(session.id, session.mediaUrl)
   );
   const status = useAudioPlayerStatus(player);
   const [isStarting, setIsStarting] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const hasRestoredPosition = useRef(!shouldRestorePosition);
+  const restorePosition = useRef(sanitizePlaybackTime(initialPosition));
+  const hasRestoredPosition = useRef(false);
   const hasReportedCompletion = useRef(false);
   const wasPlaying = useRef(false);
   const reportProgress = useEffectEvent((position: number, totalDuration: number) => {
@@ -108,15 +137,20 @@ function AudioSessionPlayer({
     if (status.didJustFinish) {
       if (!hasReportedCompletion.current) {
         hasReportedCompletion.current = true;
-        reportCompletion();
+        completePlayback(PERSISTENT_AUDIO_PLAYBACK_ID, session.title, reportCompletion);
       }
-      void playbackCoordinator.finish(PERSISTENT_AUDIO_PLAYBACK_ID);
     }
-  }, [status.didJustFinish]);
+  }, [session.title, status.didJustFinish]);
 
   const currentTime = sanitizePlaybackTime(status.currentTime);
   const duration = sanitizePlaybackTime(status.duration);
-  const progress = getPlaybackProgress(currentTime, duration);
+  const playbackRate = getSupportedAudioPlaybackRate(status.playbackRate);
+
+  useEffect(() => {
+    if (loadError) {
+      void playbackCoordinator.stop(PERSISTENT_AUDIO_PLAYBACK_ID);
+    }
+  }, [loadError]);
 
   useEffect(() => {
     if (!status.isLoaded || hasRestoredPosition.current) {
@@ -125,12 +159,12 @@ function AudioSessionPlayer({
 
     hasRestoredPosition.current = true;
 
-    if (initialPosition > 1 && (!duration || initialPosition < duration - 2)) {
-      void player.seekTo(initialPosition).catch((error) => {
+    if (shouldRestorePlaybackPosition(currentTime, restorePosition.current, duration)) {
+      void player.seekTo(restorePosition.current).catch((error) => {
         console.warn(`Unable to restore ${session.title}.`, error);
       });
     }
-  }, [duration, initialPosition, player, session.title, status.isLoaded]);
+  }, [currentTime, duration, player, session.title, status.isLoaded]);
 
   useEffect(() => {
     if (duration > 0) {
@@ -146,7 +180,7 @@ function AudioSessionPlayer({
     wasPlaying.current = status.playing;
   }, [currentTime, duration, status.didJustFinish, status.playing]);
 
-  async function togglePlayback() {
+  async function togglePlayback(): Promise<void> {
     if (status.playing) {
       await playbackCoordinator.stop(PERSISTENT_AUDIO_PLAYBACK_ID);
       return;
@@ -167,17 +201,22 @@ function AudioSessionPlayer({
       }
 
       await playbackCoordinator.start(PERSISTENT_AUDIO_PLAYBACK_ID, () => {
-        player.setActiveForLockScreen(true, {
-          artist: 'Heart Hugs',
-          artworkUrl: session.thumbnailUrl,
-          title: session.title,
-        }, {
-          showSeekBackward: true,
-          showSeekForward: true,
-        });
+        player.setActiveForLockScreen(
+          true,
+          {
+            artist: 'Heart Hugs',
+            artworkUrl: session.thumbnailUrl,
+            title: session.title,
+          },
+          {
+            showSeekBackward: true,
+            showSeekForward: true,
+          }
+        );
         player.play();
       });
     } catch (error) {
+      await playbackCoordinator.stop(PERSISTENT_AUDIO_PLAYBACK_ID);
       console.warn(`Unable to play ${session.title}.`, error);
       setPlaybackError('Playback could not start. Please try again.');
     } finally {
@@ -185,29 +224,36 @@ function AudioSessionPlayer({
     }
   }
 
-  async function seekAudio(time: number) {
+  async function seekAudio(time: number): Promise<void> {
     if (!status.isLoaded) {
       return;
     }
 
     try {
       await player.seekTo(time);
+      setPlaybackError(null);
     } catch (error) {
       console.warn(`Unable to seek ${session.title}.`, error);
       setPlaybackError('Playback could not seek to that position. Please try again.');
     }
   }
 
-  function cycleAudioPlaybackRate() {
-    const rates = [0.75, 1, 1.25, 1.5];
-    const currentIndex = rates.indexOf(playbackRate);
-    const nextRate = rates[(currentIndex + 1) % rates.length];
-
-    player.setPlaybackRate(nextRate);
-    setPlaybackRate(nextRate);
+  function cycleAudioPlaybackRate(): void {
+    try {
+      player.setPlaybackRate(getNextAudioPlaybackRate(playbackRate));
+      setPlaybackError(null);
+    } catch (error) {
+      console.warn(`Unable to change playback speed for ${session.title}.`, error);
+      setPlaybackError('Playback speed could not be changed. Please try again.');
+    }
   }
 
-  function retryAudio() {
+  function retryAudio(): void {
+    restorePosition.current = getRetryRestorePosition(
+      currentTime,
+      restorePosition.current
+    );
+    hasRestoredPosition.current = false;
     void playbackCoordinator.stop(PERSISTENT_AUDIO_PLAYBACK_ID);
     setPlaybackError(null);
     setRetryAttempt((attempt) => attempt + 1);
@@ -223,7 +269,7 @@ function AudioSessionPlayer({
   return (
     <View style={styles.surface}>
       <LinearGradient colors={gradients.player} style={styles.audioGradient}>
-        <SessionCopy session={session} tone="overlay" />
+        <SessionCopy session={session} />
 
         {errorMessage || isLoading ? (
           <PlaybackStatusMessage
@@ -275,7 +321,6 @@ function AudioSessionPlayer({
           currentTime={currentTime}
           duration={duration}
           onSeek={seekAudio}
-          progress={progress}
           tone="overlay"
         />
       </LinearGradient>
@@ -289,7 +334,7 @@ function VideoSessionPlayer({
   onPause,
   onProgress,
   session,
-}: MediaPlayerProps) {
+}: MediaPlayerProps): ReactElement {
   const isFocused = useIsFocused();
   const playbackInstanceId = usePlaybackInstanceId();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -300,6 +345,7 @@ function VideoSessionPlayer({
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [hasFinished, setHasFinished] = useState(false);
+  const restorePosition = useRef(sanitizePlaybackTime(initialPosition));
   const hasRestoredPosition = useRef(false);
   const reportProgress = useEffectEvent((position: number, totalDuration: number) => {
     onProgress?.(position, totalDuration);
@@ -345,9 +391,12 @@ function VideoSessionPlayer({
   }, [playbackInstanceId]);
 
   useRegisteredPlaybackPauser(playbackInstanceId, 'video', () => {
-    onPause?.(currentTime, duration);
-    player.pause();
-    setIsPlaying(false);
+    try {
+      player.pause();
+    } finally {
+      setIsPlaying(false);
+      onPause?.(currentTime, duration);
+    }
   });
 
   useEventListener(player, 'playingChange', ({ isPlaying: nextIsPlaying }) => {
@@ -365,18 +414,29 @@ function VideoSessionPlayer({
     setDuration(nextDuration);
 
     if (nextStatus === 'error') {
-      setPlaybackError(error?.message || 'This video could not be loaded.');
+      console.warn(`Unable to load ${session.title}.`, error);
+      setPlaybackError('This video could not be loaded. Please try again.');
+      void playbackCoordinator.stop(playbackInstanceId);
     } else if (nextStatus === 'readyToPlay') {
       setPlaybackError(null);
 
-      if (
-        !hasRestoredPosition.current &&
-        initialPosition > 1 &&
-        (!nextDuration || initialPosition < nextDuration - 2)
-      ) {
+      if (!hasRestoredPosition.current) {
         hasRestoredPosition.current = true;
-        player.seekBy(initialPosition - player.currentTime);
-        setCurrentTime(initialPosition);
+
+        if (
+          shouldRestorePlaybackPosition(
+            player.currentTime,
+            restorePosition.current,
+            nextDuration
+          )
+        ) {
+          try {
+            player.seekBy(restorePosition.current - player.currentTime);
+            setCurrentTime(restorePosition.current);
+          } catch (restoreError) {
+            console.warn(`Unable to restore ${session.title}.`, restoreError);
+          }
+        }
       }
     }
   });
@@ -384,11 +444,10 @@ function VideoSessionPlayer({
   useEventListener(player, 'playToEnd', () => {
     setCurrentTime(sanitizePlaybackTime(player.duration));
     setHasFinished(true);
-    onComplete?.();
-    void playbackCoordinator.finish(playbackInstanceId);
+    completePlayback(playbackInstanceId, session.title, () => onComplete?.());
   });
 
-  async function togglePlayback() {
+  async function togglePlayback(): Promise<void> {
     if (isPlaying) {
       await playbackCoordinator.stop(playbackInstanceId);
       return;
@@ -416,6 +475,7 @@ function VideoSessionPlayer({
         setHasFinished(false);
       }
     } catch (error) {
+      await playbackCoordinator.stop(playbackInstanceId);
       console.warn(`Unable to play ${session.title}.`, error);
       setPlaybackError('Playback could not start. Please try again.');
     } finally {
@@ -423,10 +483,16 @@ function VideoSessionPlayer({
     }
   }
 
-  async function retryVideo() {
+  async function retryVideo(): Promise<void> {
     await playbackCoordinator.stop(playbackInstanceId);
+    restorePosition.current = getRetryRestorePosition(
+      currentTime,
+      restorePosition.current
+    );
+    hasRestoredPosition.current = false;
     setPlaybackError(null);
     setHasFinished(false);
+    setPlaybackStatus('loading');
     setRetryAttempt((attempt) => attempt + 1);
 
     try {
@@ -437,7 +503,7 @@ function VideoSessionPlayer({
     }
   }
 
-  function seekVideo(time: number) {
+  function seekVideo(time: number): void {
     if (playbackStatus !== 'readyToPlay') {
       return;
     }
@@ -446,13 +512,12 @@ function VideoSessionPlayer({
       player.seekBy(time - currentTime);
       setCurrentTime(time);
       setHasFinished(duration > 0 && time >= duration);
+      setPlaybackError(null);
     } catch (error) {
       console.warn(`Unable to seek ${session.title}.`, error);
       setPlaybackError('Playback could not seek to that position. Please try again.');
     }
   }
-
-  const progress = getPlaybackProgress(currentTime, duration);
 
   useEffect(() => {
     if (duration > 0) {
@@ -465,14 +530,13 @@ function VideoSessionPlayer({
       <View style={styles.videoShell}>
         <VideoView
           contentFit="cover"
-          fullscreenOptions={{ enable: true }}
           nativeControls={false}
           player={player}
           style={styles.video}
           surfaceType="textureView"
         />
         <LinearGradient
-          colors={['rgba(23, 42, 68, 0)', 'rgba(23, 42, 68, 0.72)']}
+          colors={VIDEO_CONTROL_GRADIENT}
           style={styles.videoControlGradient}
         >
           <View style={styles.videoControls}>
@@ -495,7 +559,6 @@ function VideoSessionPlayer({
                 currentTime={currentTime}
                 duration={duration}
                 onSeek={seekVideo}
-                progress={progress}
                 tone="overlay"
               />
             </View>
@@ -514,7 +577,7 @@ function VideoSessionPlayer({
             timeoutMessage="This video is taking longer than expected to load."
           />
         ) : null}
-        <SessionCopy session={session} tone="overlay" />
+        <SessionCopy session={session} />
         <View style={styles.videoTransportRow}>
           <TransportButton
             accessibilityLabel="Rewind video 15 seconds"
@@ -538,12 +601,12 @@ function VideoSessionPlayer({
 }
 
 type PlaybackStatusMessageProps = {
-  errorMessage: string | null;
-  isLoading: boolean;
-  loadingDelayMs?: number;
-  loadingMessage: string;
-  onRetry: () => void;
-  timeoutMessage: string;
+  readonly errorMessage: string | null;
+  readonly isLoading: boolean;
+  readonly loadingDelayMs?: number;
+  readonly loadingMessage: string;
+  readonly onRetry: () => void | Promise<void>;
+  readonly timeoutMessage: string;
 };
 
 function PlaybackStatusMessage({
@@ -553,9 +616,11 @@ function PlaybackStatusMessage({
   loadingMessage,
   onRetry,
   timeoutMessage,
-}: PlaybackStatusMessageProps) {
+}: PlaybackStatusMessageProps): ReactElement | null {
   const [hasTimedOut, setHasTimedOut] = useState(false);
   const [hasLoadingDelayElapsed, setHasLoadingDelayElapsed] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const isRetryInFlight = useRef(false);
 
   useEffect(() => {
     if (!isLoading || errorMessage || loadingDelayMs <= 0) {
@@ -584,13 +649,33 @@ function PlaybackStatusMessage({
   const visibleError = errorMessage ?? (hasTimedOut ? timeoutMessage : null);
   const isLoadingVisible = loadingDelayMs <= 0 || hasLoadingDelayElapsed;
 
+  function handleRetry(): void {
+    if (isRetryInFlight.current) {
+      return;
+    }
+
+    isRetryInFlight.current = true;
+    setIsRetrying(true);
+    void (async () => {
+      try {
+        await onRetry();
+      } catch (error) {
+        console.warn('Unable to retry media loading.', error);
+      } finally {
+        isRetryInFlight.current = false;
+        setIsRetrying(false);
+      }
+    })();
+  }
+
   if (!visibleError && (!isLoading || !isLoadingVisible)) {
     return null;
   }
 
   return (
     <View
-      accessibilityLiveRegion="polite"
+      accessibilityLiveRegion={visibleError ? 'assertive' : 'polite'}
+      accessibilityRole={visibleError ? 'alert' : undefined}
       style={[styles.statusMessage, visibleError && styles.errorMessage]}
     >
       {visibleError ? (
@@ -603,45 +688,45 @@ function PlaybackStatusMessage({
         <BreathingPressable
           accessibilityLabel="Retry loading this session"
           accessibilityRole="button"
+          accessibilityState={{ busy: isRetrying, disabled: isRetrying }}
+          disabled={isRetrying}
           hitSlop={theme.spacing.xs}
-          onPress={onRetry}
+          onPress={handleRetry}
           style={styles.retryButton}
         >
-          <RotateCcw color={colors.leafDeep} size={15} />
-          <Text style={styles.retryButtonText}>Retry</Text>
+          {isRetrying ? (
+            <ActivityIndicator color={colors.leafDeep} size="small" />
+          ) : (
+            <RotateCcw color={colors.leafDeep} size={15} />
+          )}
+          <Text style={styles.retryButtonText}>{isRetrying ? 'Retrying' : 'Retry'}</Text>
         </BreathingPressable>
       ) : null}
     </View>
   );
 }
 
-type SessionCopyProps = MediaPlayerProps & {
-  tone?: 'default' | 'overlay';
+type SessionCopyProps = {
+  readonly session: Session;
 };
 
-function SessionCopy({ session, tone = 'default' }: SessionCopyProps) {
-  const isOverlay = tone === 'overlay';
-
+function SessionCopy({ session }: SessionCopyProps): ReactElement {
   return (
     <View style={styles.sessionCopy}>
-      <Text style={[styles.playerEyebrow, isOverlay && styles.overlayPlayerEyebrow]}>
+      <Text style={styles.playerEyebrow}>
         {session.mediaType === 'audio' ? 'Audio session' : 'Video session'}
       </Text>
-      <Text style={[styles.playerTitle, isOverlay && styles.overlayPlayerText]}>
-        {session.title}
-      </Text>
-      <Text style={[styles.playerDescription, isOverlay && styles.overlayPlayerDescription]}>
-        {session.description}
-      </Text>
+      <Text style={styles.playerTitle}>{session.title}</Text>
+      <Text style={styles.playerDescription}>{session.description}</Text>
     </View>
   );
 }
 
 type TransportButtonProps = {
-  accessibilityLabel: string;
-  children: ReactNode;
-  disabled?: boolean;
-  onPress: () => void | Promise<void>;
+  readonly accessibilityLabel: string;
+  readonly children: ReactNode;
+  readonly disabled?: boolean;
+  readonly onPress: () => void | Promise<void>;
 };
 
 function TransportButton({
@@ -649,8 +734,8 @@ function TransportButton({
   children,
   disabled = false,
   onPress,
-}: TransportButtonProps) {
-  function handlePress() {
+}: TransportButtonProps): ReactElement {
+  function handlePress(): void {
     try {
       const result = onPress();
       if (result) {
@@ -678,7 +763,12 @@ function TransportButton({
   );
 }
 
-function PlaybackRateButton({ onPress, rate }: { onPress: () => void; rate: number }) {
+type PlaybackRateButtonProps = {
+  readonly onPress: () => void;
+  readonly rate: number;
+};
+
+function PlaybackRateButton({ onPress, rate }: PlaybackRateButtonProps): ReactElement {
   return (
     <BreathingPressable
       accessibilityLabel={`Playback speed ${rate} times. Change playback speed.`}
@@ -778,7 +868,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: theme.radius.full,
     borderWidth: 1,
-    minHeight: 38,
+    minHeight: 44,
     minWidth: 62,
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.sm,
@@ -808,7 +898,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.size.xs,
   },
   playerEyebrow: {
-    color: colors.leafDeep,
+    color: colors.vitality,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xs,
     lineHeight: theme.typography.lineHeight.sm,
@@ -816,27 +906,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   playerTitle: {
-    color: colors.navy,
+    color: colors.white,
     fontFamily: theme.typography.fontFamily.semibold,
     fontSize: theme.typography.size.xl,
     lineHeight: theme.typography.lineHeight.xl,
     textAlign: 'center',
   },
   playerDescription: {
-    color: colors.inkMuted,
+    color: colors.whiteMuted,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.md,
     textAlign: 'center',
-  },
-  overlayPlayerEyebrow: {
-    color: colors.vitality,
-  },
-  overlayPlayerText: {
-    color: colors.white,
-  },
-  overlayPlayerDescription: {
-    color: colors.whiteMuted,
   },
   videoShell: {
     aspectRatio: 16 / 9,

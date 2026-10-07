@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   Platform,
@@ -11,51 +10,79 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { useReducedMotion } from '../hooks/useReducedMotion';
+
 const EXPANDED_SCALE = 1.085;
 const INHALE_DURATION_MS = 1_000;
 const FINISH_INHALE_DURATION_MS = 500;
 const EXHALE_DURATION_MS = 1_400;
-const shouldUseNativeDriver = Platform.OS !== 'web';
+const SHOULD_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type BreathingPressableProps = Omit<PressableProps, 'style'> & {
-  containerStyle?: StyleProp<ViewStyle>;
-  style?:
+  readonly containerStyle?: StyleProp<ViewStyle>;
+  readonly style?:
     | StyleProp<ViewStyle>
     | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>);
 };
 
-export function useBreathingPressAnimation() {
+type BreathingPressAnimation = {
+  readonly animatedStyle: Animated.WithAnimatedValue<ViewStyle>;
+  readonly breatheIn: () => void;
+  readonly breatheOut: () => void;
+};
+
+export function useBreathingPressAnimation(): BreathingPressAnimation {
   const [scale] = useState(() => new Animated.Value(1));
   const activeAnimation = useRef<Animated.CompositeAnimation | null>(null);
   const isFullyExpanded = useRef(false);
-  const reduceMotion = useRef(false);
+  const isReducedMotion = useReducedMotion();
+  const resetAnimation = useCallback((): void => {
+    activeAnimation.current?.stop();
+    activeAnimation.current = null;
+    isFullyExpanded.current = false;
+    scale.setValue(1);
+  }, [scale]);
 
   useEffect(() => {
-    void AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
-      reduceMotion.current = isEnabled;
-    });
+    if (isReducedMotion) {
+      resetAnimation();
+    }
+  }, [isReducedMotion, resetAnimation]);
 
-    return () => activeAnimation.current?.stop();
+  useEffect(() => {
+    return () => {
+      activeAnimation.current?.stop();
+      activeAnimation.current = null;
+    };
   }, []);
 
-  function start(animation: Animated.CompositeAnimation, onComplete?: () => void) {
+  function start(animation: Animated.CompositeAnimation, onComplete?: () => void): void {
     activeAnimation.current?.stop();
     activeAnimation.current = animation;
     animation.start(({ finished }) => {
+      if (activeAnimation.current === animation) {
+        activeAnimation.current = null;
+      }
+
       if (finished) {
         onComplete?.();
       }
     });
   }
 
-  function breatheIn() {
+  function breatheIn(): void {
+    if (isReducedMotion) {
+      resetAnimation();
+      return;
+    }
+
     isFullyExpanded.current = false;
     start(
       Animated.timing(scale, {
-        duration: reduceMotion.current ? 80 : INHALE_DURATION_MS,
+        duration: INHALE_DURATION_MS,
         easing: Easing.out(Easing.cubic),
-        toValue: reduceMotion.current ? 1.02 : EXPANDED_SCALE,
-        useNativeDriver: shouldUseNativeDriver,
+        toValue: EXPANDED_SCALE,
+        useNativeDriver: SHOULD_USE_NATIVE_DRIVER,
       }),
       () => {
         isFullyExpanded.current = true;
@@ -63,21 +90,26 @@ export function useBreathingPressAnimation() {
     );
   }
 
-  function breatheOut() {
+  function breatheOut(): void {
+    if (isReducedMotion) {
+      resetAnimation();
+      return;
+    }
+
     const exhale = Animated.timing(scale, {
-      duration: reduceMotion.current ? 100 : EXHALE_DURATION_MS,
+      duration: EXHALE_DURATION_MS,
       easing: Easing.inOut(Easing.cubic),
       toValue: 1,
-      useNativeDriver: shouldUseNativeDriver,
+      useNativeDriver: SHOULD_USE_NATIVE_DRIVER,
     });
     const releaseAnimation = isFullyExpanded.current
       ? exhale
       : Animated.sequence([
           Animated.timing(scale, {
-            duration: reduceMotion.current ? 40 : FINISH_INHALE_DURATION_MS,
+            duration: FINISH_INHALE_DURATION_MS,
             easing: Easing.out(Easing.cubic),
-            toValue: reduceMotion.current ? 1.02 : EXPANDED_SCALE,
-            useNativeDriver: shouldUseNativeDriver,
+            toValue: EXPANDED_SCALE,
+            useNativeDriver: SHOULD_USE_NATIVE_DRIVER,
           }),
           exhale,
         ]);
@@ -99,7 +131,7 @@ export function BreathingPressable({
   onPressOut,
   style,
   ...props
-}: BreathingPressableProps) {
+}: BreathingPressableProps): ReactElement {
   const { animatedStyle, breatheIn, breatheOut } = useBreathingPressAnimation();
 
   return (

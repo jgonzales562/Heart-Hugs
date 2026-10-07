@@ -4,7 +4,7 @@ import { ActivityIndicator, ImageBackground, StyleSheet, Text, View } from 'reac
 
 import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
-import { WELLNESS_DISCLAIMER } from '../constants/disclaimer';
+import { CRISIS_SUPPORT_MESSAGE, WELLNESS_DISCLAIMER } from '../constants/disclaimer';
 import { welcomeArtwork } from '../data/sessionArtwork';
 import { colors, gradients, theme } from '../theme';
 
@@ -39,6 +39,7 @@ export function WelcomeScreen({ errorMessage, isAccepting, onAccept }: WelcomeSc
           <Text style={styles.panelTitle}>Wellness Disclaimer</Text>
         </View>
         <Text style={styles.disclaimerText}>{WELLNESS_DISCLAIMER}</Text>
+        <Text style={styles.crisisText}>{CRISIS_SUPPORT_MESSAGE}</Text>
       </View>
 
       {errorMessage ? (
@@ -135,6 +136,12 @@ const styles = StyleSheet.create({
   disclaimerText: {
     color: colors.textSecondary,
     fontFamily: theme.typography.fontFamily.regular,
+    fontSize: theme.typography.size.md,
+    lineHeight: theme.typography.lineHeight.lg,
+  },
+  crisisText: {
+    color: colors.textPrimary,
+    fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.md,
     lineHeight: theme.typography.lineHeight.lg,
   },

@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { BreathingPressable } from './BreathingPressable';
@@ -6,37 +6,39 @@ import { GradientScreen } from './GradientScreen';
 import { colors, theme } from '../theme';
 
 type AppErrorBoundaryProps = {
-  children: ReactNode;
+  readonly children: ReactNode;
 };
 
 type AppErrorBoundaryState = {
-  hasError: boolean;
+  readonly hasError: boolean;
 };
 
 export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
-  state: AppErrorBoundaryState = { hasError: false };
+  state: Readonly<AppErrorBoundaryState> = { hasError: false };
 
   static getDerivedStateFromError(): AppErrorBoundaryState {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('Heart Hugs encountered an unexpected error.', error, info.componentStack);
   }
 
-  private retry = () => {
+  private readonly retry = (): void => {
     this.setState({ hasError: false });
   };
 
-  render() {
+  render(): ReactNode {
     if (!this.state.hasError) {
       return this.props.children;
     }
 
     return (
       <GradientScreen contentContainerStyle={styles.screen} includeBottomSafeArea>
-        <View accessibilityLiveRegion="assertive" style={styles.panel}>
-          <Text style={styles.title}>Heart Hugs needs a moment</Text>
+        <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.panel}>
+          <Text accessibilityRole="header" style={styles.title}>
+            Heart Hugs needs a moment
+          </Text>
           <Text style={styles.body}>
             Something unexpected happened. Your saved practices and progress remain on this device.
           </Text>

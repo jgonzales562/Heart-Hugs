@@ -1,33 +1,28 @@
-import { Session } from '../types/session';
+import type { Session } from '../types/session';
 
 type SessionSeed = Pick<
   Session,
   | 'benefits'
   | 'category'
   | 'description'
-  | 'durationMinutes'
   | 'id'
   | 'needIds'
   | 'tags'
   | 'title'
 >;
 
-const prototypeMediaUrls = [
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-] as const;
+const featuredSessionId = 'five-senses';
+const prototypeDurationMinutes = 6;
+const prototypeMediaUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
 
 const prototypeThumbnailUrl =
   'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80';
 
-const sessionSeeds: SessionSeed[] = [
+const sessionSeeds = [
   {
     id: 'five-senses',
     title: 'Five Senses',
     description: 'A grounding check-in using what you can see, feel, hear, smell, and taste.',
-    durationMinutes: 5,
     category: 'Grounding',
     tags: ['sensory awareness', 'present moment', 'grounding'],
     benefits: ['return to the present', 'engage the senses'],
@@ -37,7 +32,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'happy-place',
     title: 'Happy Place',
     description: 'Imagine a safe, vivid place that brings ease to your body and mind.',
-    durationMinutes: 8,
     category: 'Guided Imagery',
     tags: ['safe place', 'visualization', 'ease'],
     benefits: ['support a sense of safety', 'invite calm imagery'],
@@ -45,9 +39,8 @@ const sessionSeeds: SessionSeed[] = [
   },
   {
     id: 'star-fish',
-    title: 'Star Fish',
+    title: 'Starfish',
     description: 'Follow a gentle ocean visualization shaped by the five points of a starfish.',
-    durationMinutes: 6,
     category: 'Guided Imagery',
     tags: ['ocean', 'starfish', 'visualization'],
     benefits: ['focus attention', 'settle into a steady rhythm'],
@@ -55,9 +48,8 @@ const sessionSeeds: SessionSeed[] = [
   },
   {
     id: 'falling-leaves-river',
-    title: 'Falling Leaves In The River',
+    title: 'Falling Leaves in the River',
     description: 'Picture thoughts as leaves drifting downstream without needing to hold them.',
-    durationMinutes: 10,
     category: 'Guided Imagery',
     tags: ['letting go', 'river', 'visualization'],
     benefits: ['create distance from thoughts', 'practice gentle release'],
@@ -67,7 +59,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'body-mind-connection',
     title: 'Body & Mind Connection',
     description: 'Notice how thoughts, breath, emotions, and body sensations move together.',
-    durationMinutes: 8,
     category: 'Mindfulness',
     tags: ['body scan', 'awareness', 'mindfulness'],
     benefits: ['build body awareness', 'notice inner patterns'],
@@ -75,10 +66,9 @@ const sessionSeeds: SessionSeed[] = [
   },
   {
     id: 'super-hero-pose',
-    title: 'Super Hero Pose',
+    title: 'Superhero Pose',
     description: 'Explore an open, steady stance designed to help you feel present and capable.',
-    durationMinutes: 5,
-    category: 'Mood Elevating Positions',
+    category: 'Supportive Postures',
     tags: ['posture', 'confidence', 'movement'],
     benefits: ['encourage an open posture', 'invite energized attention'],
     needIds: ['mood-elevating-positions'],
@@ -87,8 +77,7 @@ const sessionSeeds: SessionSeed[] = [
     id: 'heart-hugs',
     title: 'Heart Hugs',
     description: 'Wrap your arms around yourself in a gentle posture of warmth and care.',
-    durationMinutes: 7,
-    category: 'Mood Elevating Positions',
+    category: 'Supportive Postures',
     tags: ['self-hug', 'comfort', 'posture'],
     benefits: ['practice self-kindness', 'create a comforting pause'],
     needIds: ['mood-elevating-positions'],
@@ -97,8 +86,7 @@ const sessionSeeds: SessionSeed[] = [
     id: 'tree-hug',
     title: 'Tree Hug',
     description: 'Connect with steadiness through a grounded, tree-inspired embrace.',
-    durationMinutes: 6,
-    category: 'Mood Elevating Positions',
+    category: 'Supportive Postures',
     tags: ['tree', 'connection', 'posture'],
     benefits: ['invite grounded energy', 'practice gentle connection'],
     needIds: ['mood-elevating-positions'],
@@ -107,7 +95,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'water',
     title: 'Water',
     description: 'Rest your attention on the soft movement, bubbles, and ripples of water.',
-    durationMinutes: 10,
     category: 'Nature Sounds',
     tags: ['water', 'ripples', 'ambient sound'],
     benefits: ['create a quiet soundscape', 'support restful attention'],
@@ -117,7 +104,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'ocean',
     title: 'Ocean',
     description: 'Settle into the spacious rhythm of waves arriving and receding.',
-    durationMinutes: 10,
     category: 'Nature Sounds',
     tags: ['ocean', 'waves', 'ambient sound'],
     benefits: ['follow a steady rhythm', 'invite a sense of spaciousness'],
@@ -127,7 +113,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'rain',
     title: 'Rain',
     description: 'Listen to a gentle rainfall atmosphere with soft puddle echoes.',
-    durationMinutes: 10,
     category: 'Nature Sounds',
     tags: ['rain', 'puddles', 'ambient sound'],
     benefits: ['create a cozy pause', 'support quiet focus'],
@@ -135,9 +120,8 @@ const sessionSeeds: SessionSeed[] = [
   },
   {
     id: 'african-beats',
-    title: 'African Beats',
+    title: 'Rhythmic Shake',
     description: 'Move with layered hand-percussion rhythms and let your body shake freely.',
-    durationMinutes: 6,
     category: 'Shaking',
     tags: ['rhythm', 'percussion', 'shaking'],
     benefits: ['encourage free movement', 'release restless energy'],
@@ -147,7 +131,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'lets-move',
     title: "Let's Move",
     description: 'Flow through approachable reaches and stretches at your own pace.',
-    durationMinutes: 8,
     category: 'Gentle Stretching',
     tags: ['stretching', 'mobility', 'gentle movement'],
     benefits: ['create space in the body', 'invite comfortable movement'],
@@ -157,8 +140,7 @@ const sessionSeeds: SessionSeed[] = [
     id: 'controlled',
     title: 'Controlled',
     description: 'Practice an even, intentional breathing rhythm with a steady visual pace.',
-    durationMinutes: 5,
-    category: 'Breathworks',
+    category: 'Breathwork',
     tags: ['paced breathing', 'control', 'focus'],
     benefits: ['practice an even rhythm', 'support focused attention'],
     needIds: ['breathworks'],
@@ -167,8 +149,7 @@ const sessionSeeds: SessionSeed[] = [
     id: 'belly-breathing',
     title: 'Belly Breathing',
     description: 'Bring your attention to the gentle rise and fall of breath in the abdomen.',
-    durationMinutes: 7,
-    category: 'Breathworks',
+    category: 'Breathwork',
     tags: ['diaphragmatic breathing', 'body awareness', 'breath'],
     benefits: ['notice abdominal movement', 'practice slower breathing'],
     needIds: ['breathworks'],
@@ -177,18 +158,16 @@ const sessionSeeds: SessionSeed[] = [
     id: 'fast-slow-breathing',
     title: 'Fast-Slow Breathing',
     description: 'Compare quicker and slower breath patterns while staying within your comfort.',
-    durationMinutes: 6,
-    category: 'Breathworks',
+    category: 'Breathwork',
     tags: ['breath rhythm', 'contrast', 'regulation'],
     benefits: ['notice changing rhythms', 'build breath awareness'],
     needIds: ['breathworks'],
   },
   {
     id: 'foot-detox',
-    title: 'Foot Detox',
+    title: 'Botanical Foot Soak',
     description: 'Create a warm botanical foot-soak ritual focused on rest and sensory care.',
-    durationMinutes: 10,
-    category: 'Natural Remedies',
+    category: 'Sensory Rituals',
     tags: ['foot soak', 'botanicals', 'sensory ritual'],
     benefits: ['make space for rest', 'practice sensory care'],
     needIds: ['natural-remedies'],
@@ -197,8 +176,7 @@ const sessionSeeds: SessionSeed[] = [
     id: 'tea-time',
     title: 'Tea Time',
     description: 'Slow down with the warmth, aroma, and simple ritual of herbal tea.',
-    durationMinutes: 8,
-    category: 'Natural Remedies',
+    category: 'Sensory Rituals',
     tags: ['tea', 'warmth', 'ritual'],
     benefits: ['engage the senses', 'create an intentional pause'],
     needIds: ['natural-remedies'],
@@ -207,8 +185,7 @@ const sessionSeeds: SessionSeed[] = [
     id: 'barefoot-grass-walk',
     title: 'Barefoot Grass Walk',
     description: 'Imagine each step through cool grass with attention to texture and contact.',
-    durationMinutes: 7,
-    category: 'Natural Remedies',
+    category: 'Sensory Rituals',
     tags: ['grass', 'barefoot', 'sensory walk'],
     benefits: ['notice texture and movement', 'reconnect with the ground'],
     needIds: ['natural-remedies'],
@@ -217,7 +194,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'guided-meditation',
     title: 'Guided Meditation',
     description: 'Follow a calm path through desert trees, water, and distant mountains.',
-    durationMinutes: 10,
     category: 'Nature Walk',
     tags: ['nature walk', 'meditation', 'desert'],
     benefits: ['imagine steady movement', 'connect with a natural landscape'],
@@ -227,7 +203,6 @@ const sessionSeeds: SessionSeed[] = [
     id: 'feminine-energy',
     title: 'Feminine Energy',
     description: 'Reflect on receptive, intuitive, and flowing qualities within yourself.',
-    durationMinutes: 10,
     category: 'Manifestation',
     tags: ['intention', 'feminine energy', 'reflection'],
     benefits: ['explore inner qualities', 'clarify an intention'],
@@ -237,20 +212,20 @@ const sessionSeeds: SessionSeed[] = [
     id: 'masculine-energy',
     title: 'Masculine Energy',
     description: 'Reflect on grounded, purposeful, and steady qualities within yourself.',
-    durationMinutes: 10,
     category: 'Manifestation',
     tags: ['intention', 'masculine energy', 'reflection'],
     benefits: ['explore inner qualities', 'clarify an intention'],
     needIds: ['manifestation'],
   },
-];
+] satisfies readonly SessionSeed[];
 
-export const sessionCatalog: Session[] = sessionSeeds.map((seed, index) => ({
+export const sessionCatalog: readonly Session[] = sessionSeeds.map((seed) => ({
   ...seed,
   authorName: 'Heart Hugs',
   contentStatus: 'prototype',
-  isFeatured: index === 0,
+  durationMinutes: prototypeDurationMinutes,
+  isFeatured: seed.id === featuredSessionId,
   mediaType: 'audio',
-  mediaUrl: prototypeMediaUrls[index % prototypeMediaUrls.length],
+  mediaUrl: prototypeMediaUrl,
   thumbnailUrl: prototypeThumbnailUrl,
 }));

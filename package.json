@@ -1,7 +1,11 @@
 {
   "name": "heart-hugs",
-  "version": "1.0.0",
+  "version": "1.2.3",
+  "packageManager": "npm@10.8.2",
   "main": "index.ts",
+  "engines": {
+    "node": "^20.19.4 || ^22.13.0 || ^24.3.0 || >=25.0.0"
+  },
   "scripts": {
     "start": "expo start",
     "phone": "expo start --dev-client --tunnel",
@@ -50,7 +54,8 @@
   "jest": {
     "preset": "jest-expo",
     "testMatch": [
-      "**/__tests__/**/*.test.ts"
+      "**/__tests__/**/*.test.ts",
+      "**/__tests__/**/*.test.tsx"
     ]
   },
   "private": true

@@ -1,5 +1,5 @@
-export function formatPlaybackTime(value?: number) {
-  const safeValue = Number.isFinite(value) && value ? Math.max(0, value) : 0;
+export function formatPlaybackTime(value?: number): string {
+  const safeValue = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
   const minutes = Math.floor(safeValue / 60);
   const seconds = Math.floor(safeValue % 60);
 

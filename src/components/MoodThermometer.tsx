@@ -1,40 +1,51 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Check, Heart, Sparkles, Thermometer } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
 import {
-  AccessibilityInfo,
+  memo,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
+import {
   Animated,
   Easing,
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type AccessibilityActionEvent,
   type GestureResponderEvent,
   type LayoutChangeEvent,
 } from 'react-native';
 
-import { colors, theme } from '../theme';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import type { MoodCheckIn } from '../state/wellnessState';
+import { colors, theme } from '../theme';
+import {
+  clampMoodValue,
+  createMoodLogGuard,
+  formatCheckInDateTime,
+  getMoodDescriptor,
+  getMoodValueFromPosition,
+} from '../utils/mood';
 import { BreathingPressable, useBreathingPressAnimation } from './BreathingPressable';
 
 type MoodThermometerProps = {
-  latestCheckIn?: MoodCheckIn;
-  onDragStateChange?: (isDragging: boolean) => void;
-  onLogMood: (value: number, note?: string) => void;
+  readonly latestCheckIn?: MoodCheckIn;
+  readonly onDragStateChange?: (isDragging: boolean) => void;
+  readonly onLogMood: (value: number) => void;
 };
 
-const moodDescriptors = [
-  { label: 'Running on empty', max: 20, note: 'You can meet this moment gently.' },
-  { label: 'Feeling low', max: 40, note: 'A small act of care can be enough.' },
-  { label: 'In between', max: 60, note: 'Notice what is here without judgment.' },
-  { label: 'Feeling good', max: 80, note: 'Let yourself take in what feels supportive.' },
-  { label: 'Feeling bright', max: 100, note: 'Make room for this energy and warmth.' },
-] as const;
-
+const CARD_GRADIENT = [colors.lavenderSoft, colors.peachSoft, colors.tealMist] as const;
+const METER_GRADIENT = [colors.violetDeep, colors.hotPink, colors.sunshine] as const;
+const GRADIENT_START = { x: 0, y: 0 } as const;
+const CARD_GRADIENT_END = { x: 1, y: 1 } as const;
+const HORIZONTAL_GRADIENT_END = { x: 1, y: 0 } as const;
 const LOGGED_CONFIRMATION_DURATION_MS = 3_000;
-const celebrationParticles = [
+const CELEBRATION_PARTICLES = [
   { color: colors.hotPink, delay: 0.02, height: 8, rotation: '-110deg', width: 16, x: -142, y: -72 },
   { color: colors.sunshine, delay: 0.08, height: 11, rotation: '-68deg', width: 11, x: -124, y: -118 },
   { color: colors.aqua, delay: 0.14, height: 7, rotation: '-42deg', width: 17, x: -94, y: -146 },
@@ -48,28 +59,18 @@ const celebrationParticles = [
   { color: colors.magenta, delay: 0.16, height: 8, rotation: '220deg', width: 17, x: 132, y: -126 },
   { color: colors.leafBright, delay: 0.06, height: 11, rotation: '170deg', width: 11, x: 148, y: -68 },
 ] as const;
-const shouldUseNativeDriver = Platform.OS !== 'web';
-
-export function getMoodDescriptor(value: number) {
-  const safeValue = clampMoodValue(value);
-
-  return (
-    moodDescriptors.find((descriptor) => safeValue <= descriptor.max) ??
-    moodDescriptors[moodDescriptors.length - 1]
-  );
-}
+const SHOULD_USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export function MoodThermometer({
   latestCheckIn,
   onDragStateChange,
   onLogMood,
-}: MoodThermometerProps) {
+}: MoodThermometerProps): ReactElement {
   const [moodValue, setMoodValue] = useState(latestCheckIn?.value ?? 50);
-  const [reflection, setReflection] = useState('');
   const [hasJustLogged, setHasJustLogged] = useState(false);
   const [celebrationProgress] = useState(() => new Animated.Value(0));
+  const [logGuard] = useState(createMoodLogGuard);
   const loggedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reduceMotion = useRef(false);
   const sliderRef = useRef<View | null>(null);
   const trackWidth = useRef(0);
   const trackLeftPageX = useRef<number | null>(null);
@@ -77,39 +78,53 @@ export function MoodThermometer({
   const dragStartValue = useRef(moodValue);
   const dragTrackWidth = useRef(0);
   const isDragging = useRef(false);
+  const isReducedMotion = useReducedMotion();
   const { animatedStyle, breatheIn, breatheOut } = useBreathingPressAnimation();
-  const {
-    animatedStyle: reflectionAnimatedStyle,
-    breatheIn: reflectionBreatheIn,
-    breatheOut: reflectionBreatheOut,
-  } = useBreathingPressAnimation();
   const descriptor = getMoodDescriptor(moodValue);
   const progressWidth = `${moodValue}%` as `${number}%`;
+  const logButtonAnimatedStyle = useMemo(
+    () => ({
+      transform: [
+        {
+          scale: celebrationProgress.interpolate({
+            inputRange: [0, 0.1, 0.24, 0.42, 0.62, 1],
+            outputRange: [1, 1.12, 0.96, 1.07, 0.99, 1],
+          }),
+        },
+      ],
+    }),
+    [celebrationProgress]
+  );
+  const notifyDragEnded = useEffectEvent(() => onDragStateChange?.(false));
 
   useEffect(() => {
-    let isMounted = true;
-
-    void AccessibilityInfo.isReduceMotionEnabled().then((isEnabled) => {
-      if (isMounted) {
-        reduceMotion.current = isEnabled;
-      }
-    });
-
     return () => {
-      isMounted = false;
       celebrationProgress.stopAnimation();
+      logGuard.release();
 
       if (loggedResetTimer.current) {
         clearTimeout(loggedResetTimer.current);
       }
-    };
-  }, [celebrationProgress]);
 
-  function updateMoodValue(value: number) {
+      if (isDragging.current) {
+        isDragging.current = false;
+        notifyDragEnded();
+      }
+    };
+  }, [celebrationProgress, logGuard]);
+
+  useEffect(() => {
+    if (isReducedMotion) {
+      celebrationProgress.stopAnimation();
+      celebrationProgress.setValue(0);
+    }
+  }, [celebrationProgress, isReducedMotion]);
+
+  function updateMoodValue(value: number): void {
     setMoodValue(Math.round(clampMoodValue(value)));
   }
 
-  function beginGesture(event: GestureResponderEvent) {
+  function beginGesture(event: GestureResponderEvent): void {
     const pageX = event.nativeEvent.pageX;
 
     isDragging.current = true;
@@ -133,7 +148,7 @@ export function MoodThermometer({
     });
   }
 
-  function updateFromGesture(event: GestureResponderEvent) {
+  function updateFromGesture(event: GestureResponderEvent): void {
     if (dragTrackWidth.current <= 0) {
       return;
     }
@@ -145,7 +160,7 @@ export function MoodThermometer({
     );
   }
 
-  function handleTrackLayout(event: LayoutChangeEvent) {
+  function handleTrackLayout(event: LayoutChangeEvent): void {
     trackWidth.current = event.nativeEvent.layout.width;
     sliderRef.current?.measureInWindow((left, _top, width) => {
       if (width > 0) {
@@ -155,8 +170,8 @@ export function MoodThermometer({
     });
   }
 
-  function startDragFromPosition(pageX: number, trackLeft: number, width: number) {
-    const nextValue = clampMoodValue(((pageX - trackLeft) / width) * 100);
+  function startDragFromPosition(pageX: number, trackLeft: number, width: number): void {
+    const nextValue = getMoodValueFromPosition(pageX, trackLeft, width);
 
     dragStartPageX.current = pageX;
     dragStartValue.current = nextValue;
@@ -164,14 +179,18 @@ export function MoodThermometer({
     updateMoodValue(nextValue);
   }
 
-  function finishGesture() {
+  function finishGesture(): void {
+    if (!isDragging.current) {
+      return;
+    }
+
     isDragging.current = false;
     dragTrackWidth.current = 0;
     onDragStateChange?.(false);
     breatheOut();
   }
 
-  function handleAccessibilityAction(event: AccessibilityActionEvent) {
+  function handleAccessibilityAction(event: AccessibilityActionEvent): void {
     if (event.nativeEvent.actionName === 'increment') {
       updateMoodValue(moodValue + 5);
     } else if (event.nativeEvent.actionName === 'decrement') {
@@ -179,9 +198,19 @@ export function MoodThermometer({
     }
   }
 
-  function logMood() {
-    onLogMood(moodValue, reflection);
-    setReflection('');
+  function logMood(): void {
+    if (!logGuard.tryAcquire()) {
+      return;
+    }
+
+    try {
+      onLogMood(moodValue);
+    } catch (error) {
+      logGuard.release();
+      console.warn('Unable to log mood check-in.', error);
+      return;
+    }
+
     setHasJustLogged(true);
 
     if (loggedResetTimer.current) {
@@ -191,26 +220,27 @@ export function MoodThermometer({
     celebrationProgress.stopAnimation();
     celebrationProgress.setValue(0);
 
-    if (!reduceMotion.current) {
+    if (!isReducedMotion) {
       Animated.timing(celebrationProgress, {
         duration: 1_600,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: shouldUseNativeDriver,
+        useNativeDriver: SHOULD_USE_NATIVE_DRIVER,
       }).start();
     }
 
     loggedResetTimer.current = setTimeout(() => {
       setHasJustLogged(false);
+      logGuard.release();
       loggedResetTimer.current = null;
     }, LOGGED_CONFIRMATION_DURATION_MS);
   }
 
   return (
     <LinearGradient
-      colors={[colors.lavenderSoft, colors.peachSoft, colors.tealMist]}
-      end={{ x: 1, y: 1 }}
-      start={{ x: 0, y: 0 }}
+      colors={CARD_GRADIENT}
+      end={CARD_GRADIENT_END}
+      start={GRADIENT_START}
       style={styles.card}
     >
       <View style={styles.heading}>
@@ -225,6 +255,7 @@ export function MoodThermometer({
 
       <View>
         <View
+          accessible
           accessibilityActions={[
             { label: 'Raise mood rating', name: 'increment' },
             { label: 'Lower mood rating', name: 'decrement' },
@@ -238,10 +269,6 @@ export function MoodThermometer({
             now: moodValue,
             text: descriptor.label,
           }}
-          aria-valuemax={100}
-          aria-valuemin={0}
-          aria-valuenow={moodValue}
-          aria-valuetext={descriptor.label}
           focusable
           onAccessibilityAction={handleAccessibilityAction}
           onLayout={handleTrackLayout}
@@ -257,9 +284,9 @@ export function MoodThermometer({
         >
           <View style={styles.track}>
             <LinearGradient
-              colors={[colors.violetDeep, colors.hotPink, colors.sunshine]}
-              end={{ x: 1, y: 0 }}
-              start={{ x: 0, y: 0 }}
+              colors={METER_GRADIENT}
+              end={HORIZONTAL_GRADIENT_END}
+              start={GRADIENT_START}
               style={[styles.fill, { width: progressWidth }]}
             />
             <View style={[styles.thumbPosition, { left: progressWidth }]}>
@@ -278,9 +305,7 @@ export function MoodThermometer({
 
       <View style={styles.readingRow}>
         <View style={styles.readingCopy}>
-          <Text accessibilityLiveRegion="polite" style={styles.moodLabel}>
-            {descriptor.label}
-          </Text>
+          <Text style={styles.moodLabel}>{descriptor.label}</Text>
           <Text style={styles.moodNote}>{descriptor.note}</Text>
         </View>
         <View style={styles.scoreBubble}>
@@ -289,222 +314,20 @@ export function MoodThermometer({
         </View>
       </View>
 
-      <Animated.View style={reflectionAnimatedStyle}>
-        <TextInput
-          accessibilityLabel="Mood reflection"
-          maxLength={280}
-          multiline
-          onChangeText={setReflection}
-          onPressIn={reflectionBreatheIn}
-          onPressOut={reflectionBreatheOut}
-          placeholder="Write something about this feeling…"
-          placeholderTextColor={colors.textSecondary}
-          style={styles.reflectionInput}
-          textAlignVertical="top"
-          value={reflection}
-        />
-      </Animated.View>
-
       <View style={styles.celebrationStage}>
-        <View pointerEvents="none" style={styles.celebrationLayer}>
-          <Animated.View
-            style={[
-              styles.celebrationGlow,
-              {
-                opacity: celebrationProgress.interpolate({
-                  inputRange: [0, 0.12, 0.52, 1],
-                  outputRange: [0, 0.62, 0.26, 0],
-                }),
-                transform: [
-                  {
-                    scale: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.3, 1.6],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.celebrationRing,
-              {
-                opacity: celebrationProgress.interpolate({
-                  inputRange: [0, 0.1, 0.68, 1],
-                  outputRange: [0, 0.92, 0.34, 0],
-                }),
-                transform: [
-                  {
-                    scale: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.58, 1.48],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.celebrationRing,
-              styles.celebrationRingAqua,
-              {
-                opacity: celebrationProgress.interpolate({
-                  inputRange: [0, 0.12, 0.26, 0.82, 1],
-                  outputRange: [0, 0, 0.86, 0.28, 0],
-                }),
-                transform: [
-                  {
-                    scale: celebrationProgress.interpolate({
-                      inputRange: [0, 0.12, 1],
-                      outputRange: [0.46, 0.46, 1.36],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-          <Animated.View
-            style={[
-              styles.celebrationHeart,
-              {
-                opacity: celebrationProgress.interpolate({
-                  inputRange: [0, 0.12, 0.74, 1],
-                  outputRange: [0, 1, 0.92, 0],
-                }),
-                transform: [
-                  {
-                    translateX: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -24],
-                    }),
-                  },
-                  {
-                    translateY: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -104],
-                    }),
-                  },
-                  {
-                    rotate: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['-12deg', '18deg'],
-                    }),
-                  },
-                  {
-                    scale: celebrationProgress.interpolate({
-                      inputRange: [0, 0.2, 1],
-                      outputRange: [0.4, 1.25, 0.82],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <Heart color={colors.hotPink} fill={colors.roseSoft} size={27} strokeWidth={2.5} />
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.celebrationSparkle,
-              {
-                opacity: celebrationProgress.interpolate({
-                  inputRange: [0, 0.16, 0.76, 1],
-                  outputRange: [0, 1, 0.9, 0],
-                }),
-                transform: [
-                  {
-                    translateX: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, 25],
-                    }),
-                  },
-                  {
-                    translateY: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -88],
-                    }),
-                  },
-                  {
-                    rotate: celebrationProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '72deg'],
-                    }),
-                  },
-                  {
-                    scale: celebrationProgress.interpolate({
-                      inputRange: [0, 0.24, 1],
-                      outputRange: [0.45, 1.38, 0.78],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <Sparkles color={colors.sunshine} fill={colors.sunshineSoft} size={29} strokeWidth={2.6} />
-          </Animated.View>
-          {celebrationParticles.map((particle) => (
-            <Animated.View
-              key={`${particle.x}-${particle.y}`}
-              style={[
-                styles.celebrationParticle,
-                {
-                  backgroundColor: particle.color,
-                  borderRadius: particle.height === particle.width ? theme.radius.full : 2,
-                  height: particle.height,
-                  opacity: celebrationProgress.interpolate({
-                    inputRange: [0, particle.delay, particle.delay + 0.12, 0.78, 1],
-                    outputRange: [0, 0, 1, 0.94, 0],
-                  }),
-                  transform: [
-                    {
-                      translateX: celebrationProgress.interpolate({
-                        inputRange: [0, particle.delay, 1],
-                        outputRange: [0, 0, particle.x],
-                      }),
-                    },
-                    {
-                      translateY: celebrationProgress.interpolate({
-                        inputRange: [0, particle.delay, 1],
-                        outputRange: [0, 0, particle.y],
-                      }),
-                    },
-                    {
-                      rotate: celebrationProgress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0deg', particle.rotation],
-                      }),
-                    },
-                    {
-                      scale: celebrationProgress.interpolate({
-                        inputRange: [0, particle.delay, particle.delay + 0.16, 1],
-                        outputRange: [0.35, 0.35, 1.24, 0.68],
-                      }),
-                    },
-                  ],
-                  width: particle.width,
-                },
-              ]}
-            />
-          ))}
-        </View>
+        <MoodCelebration progress={celebrationProgress} />
 
-        <Animated.View
-          style={{
-            transform: [
-              {
-                scale: celebrationProgress.interpolate({
-                  inputRange: [0, 0.1, 0.24, 0.42, 0.62, 1],
-                  outputRange: [1, 1.12, 0.96, 1.07, 0.99, 1],
-                }),
-              },
-            ],
-          }}
-        >
+        <Animated.View style={logButtonAnimatedStyle}>
           <BreathingPressable
-            accessibilityLabel={`Log mood: ${descriptor.label}, ${moodValue} out of 100`}
+            accessibilityLabel={
+              hasJustLogged
+                ? `Mood logged: ${descriptor.label}, ${moodValue} out of 100`
+                : `Log mood: ${descriptor.label}, ${moodValue} out of 100`
+            }
             accessibilityRole="button"
+            accessibilityState={{ disabled: hasJustLogged }}
             containerStyle={styles.logButtonContainer}
+            disabled={hasJustLogged}
             onPress={logMood}
             style={[styles.logButton, hasJustLogged && styles.loggedButton]}
           >
@@ -520,34 +343,218 @@ export function MoodThermometer({
       </View>
 
       <View style={styles.history}>
-        <Text accessibilityLiveRegion="polite" style={styles.historyText}>
+        <Text style={styles.historyText}>
           {latestCheckIn
-            ? `Last check-in: ${getMoodDescriptor(latestCheckIn.value).label} · ${formatCheckInTime(latestCheckIn.recordedAt)}`
+            ? `Last check-in: ${getMoodDescriptor(latestCheckIn.value).label} · ${formatCheckInDateTime(latestCheckIn.recordedAt)}`
             : 'Your check-ins stay private on this device.'}
         </Text>
-        {latestCheckIn?.note ? (
-          <Text numberOfLines={3} style={styles.historyNote}>
-            “{latestCheckIn.note}”
-          </Text>
-        ) : null}
       </View>
     </LinearGradient>
   );
 }
 
-function clampMoodValue(value: number) {
-  return Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : 50;
-}
+type MoodCelebrationProps = {
+  readonly progress: Animated.Value;
+};
 
-function formatCheckInTime(recordedAt: string) {
-  const date = new Date(recordedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'recently';
-  }
-
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
+const MoodCelebration = memo(function MoodCelebration({
+  progress,
+}: MoodCelebrationProps): ReactElement {
+  return (
+    <View
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={styles.celebrationLayer}
+    >
+      <Animated.View
+        style={[
+          styles.celebrationGlow,
+          {
+            opacity: progress.interpolate({
+              inputRange: [0, 0.12, 0.52, 1],
+              outputRange: [0, 0.62, 0.26, 0],
+            }),
+            transform: [
+              {
+                scale: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 1.6],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.celebrationRing,
+          {
+            opacity: progress.interpolate({
+              inputRange: [0, 0.1, 0.68, 1],
+              outputRange: [0, 0.92, 0.34, 0],
+            }),
+            transform: [
+              {
+                scale: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.58, 1.48],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.celebrationRing,
+          styles.celebrationRingAqua,
+          {
+            opacity: progress.interpolate({
+              inputRange: [0, 0.12, 0.26, 0.82, 1],
+              outputRange: [0, 0, 0.86, 0.28, 0],
+            }),
+            transform: [
+              {
+                scale: progress.interpolate({
+                  inputRange: [0, 0.12, 1],
+                  outputRange: [0.46, 0.46, 1.36],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.celebrationHeart,
+          {
+            opacity: progress.interpolate({
+              inputRange: [0, 0.12, 0.74, 1],
+              outputRange: [0, 1, 0.92, 0],
+            }),
+            transform: [
+              {
+                translateX: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -24],
+                }),
+              },
+              {
+                translateY: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -104],
+                }),
+              },
+              {
+                rotate: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['-12deg', '18deg'],
+                }),
+              },
+              {
+                scale: progress.interpolate({
+                  inputRange: [0, 0.2, 1],
+                  outputRange: [0.4, 1.25, 0.82],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Heart color={colors.hotPink} fill={colors.roseSoft} size={27} strokeWidth={2.5} />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.celebrationSparkle,
+          {
+            opacity: progress.interpolate({
+              inputRange: [0, 0.16, 0.76, 1],
+              outputRange: [0, 1, 0.9, 0],
+            }),
+            transform: [
+              {
+                translateX: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 25],
+                }),
+              },
+              {
+                translateY: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -88],
+                }),
+              },
+              {
+                rotate: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '72deg'],
+                }),
+              },
+              {
+                scale: progress.interpolate({
+                  inputRange: [0, 0.24, 1],
+                  outputRange: [0.45, 1.38, 0.78],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Sparkles
+          color={colors.sunshine}
+          fill={colors.sunshineSoft}
+          size={29}
+          strokeWidth={2.6}
+        />
+      </Animated.View>
+      {CELEBRATION_PARTICLES.map((particle) => (
+        <Animated.View
+          key={`${particle.x}-${particle.y}`}
+          style={[
+            styles.celebrationParticle,
+            {
+              backgroundColor: particle.color,
+              borderRadius: particle.height === particle.width ? theme.radius.full : 2,
+              height: particle.height,
+              opacity: progress.interpolate({
+                inputRange: [0, particle.delay, particle.delay + 0.12, 0.78, 1],
+                outputRange: [0, 0, 1, 0.94, 0],
+              }),
+              transform: [
+                {
+                  translateX: progress.interpolate({
+                    inputRange: [0, particle.delay, 1],
+                    outputRange: [0, 0, particle.x],
+                  }),
+                },
+                {
+                  translateY: progress.interpolate({
+                    inputRange: [0, particle.delay, 1],
+                    outputRange: [0, 0, particle.y],
+                  }),
+                },
+                {
+                  rotate: progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', particle.rotation],
+                  }),
+                },
+                {
+                  scale: progress.interpolate({
+                    inputRange: [0, particle.delay, particle.delay + 0.16, 1],
+                    outputRange: [0.35, 0.35, 1.24, 0.68],
+                  }),
+                },
+              ],
+              width: particle.width,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -680,19 +687,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.medium,
     fontSize: theme.typography.size.xs,
   },
-  reflectionInput: {
-    backgroundColor: colors.offWhiteTransparent,
-    borderColor: colors.border,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    color: colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.regular,
-    fontSize: theme.typography.size.md,
-    lineHeight: theme.typography.lineHeight.md,
-    minHeight: 88,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
   celebrationStage: {
     overflow: 'visible',
     position: 'relative',
@@ -781,14 +775,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontFamily: theme.typography.fontFamily.regular,
     fontSize: theme.typography.size.xs,
-    lineHeight: theme.typography.lineHeight.sm,
-    textAlign: 'center',
-  },
-  historyNote: {
-    color: colors.textPrimary,
-    fontFamily: theme.typography.fontFamily.regular,
-    fontSize: theme.typography.size.xs,
-    fontStyle: 'italic',
     lineHeight: theme.typography.lineHeight.sm,
     textAlign: 'center',
   },

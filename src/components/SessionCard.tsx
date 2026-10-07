@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bookmark, ChevronRight, Clock, Headphones, Video } from 'lucide-react-native';
+import type { ReactElement } from 'react';
 import {
   Animated,
   ImageBackground,
@@ -12,33 +13,42 @@ import {
 import { BreathingPressable, useBreathingPressAnimation } from './BreathingPressable';
 import { colors, theme } from '../theme';
 import { getSessionArtwork } from '../data/sessionArtwork';
-import { Session } from '../types/session';
+import type { Session } from '../types/session';
+
+const CARD_OVERLAY_COLORS = [
+  'rgba(27, 16, 55, 0.01)',
+  'rgba(27, 16, 55, 0.16)',
+  'rgba(27, 16, 55, 0.92)',
+] as const;
+const CARD_OVERLAY_LOCATIONS = [0, 0.42, 1] as const;
 
 type SessionCardProps = {
-  isSaved?: boolean;
-  onPress: (session: Session) => void;
-  onToggleSaved?: (session: Session) => void;
-  session: Session;
-  variant?: 'large' | 'compact' | 'tile';
+  readonly isSaved: boolean;
+  readonly onPress: (session: Session) => void;
+  readonly onToggleSaved: (session: Session) => void;
+  readonly session: Session;
+  readonly variant?: 'large' | 'compact' | 'tile';
 };
 
 export function SessionCard({
-  isSaved = false,
+  isSaved,
   onPress,
   onToggleSaved,
   session,
   variant = 'compact',
-}: SessionCardProps) {
+}: SessionCardProps): ReactElement {
   const { animatedStyle, breatheIn, breatheOut } = useBreathingPressAnimation();
   const MediaIcon = session.mediaType === 'audio' ? Headphones : Video;
   const isLarge = variant === 'large';
   const isTile = variant === 'tile';
-  const highlights = [session.tags[0], session.benefits[0]]
-    .filter((highlight): highlight is string => Boolean(highlight))
-    .slice(0, 2);
+  const highlights = isLarge
+    ? [session.tags[0], session.benefits[0]].filter(
+        (highlight): highlight is string => Boolean(highlight)
+      )
+    : [];
 
-  function toggleSaved() {
-    onToggleSaved?.(session);
+  function toggleSaved(): void {
+    onToggleSaved(session);
   }
 
   return (
@@ -58,25 +68,18 @@ export function SessionCard({
         style={styles.cardPressable}
       >
         <ImageBackground
+          accessible={false}
           imageStyle={styles.image}
           source={getSessionArtwork(session)}
           style={styles.imageBackground}
         >
           <LinearGradient
-            colors={['rgba(27, 16, 55, 0.01)', 'rgba(27, 16, 55, 0.16)', 'rgba(27, 16, 55, 0.92)']}
-            locations={[0, 0.42, 1]}
+            colors={CARD_OVERLAY_COLORS}
+            locations={CARD_OVERLAY_LOCATIONS}
             style={styles.overlay}
           >
             <View style={styles.topRow}>
-              {onToggleSaved ? (
-                <View style={styles.saveButtonSpace} />
-              ) : session.isFeatured ? (
-                <View style={styles.featuredPill}>
-                  <Text style={styles.featuredText}>Featured</Text>
-                </View>
-              ) : (
-                <View />
-              )}
+              <View style={styles.saveButtonSpace} />
               <View style={styles.mediaPill}>
                 <MediaIcon color={colors.offWhite} size={14} />
                 <Text style={styles.mediaText}>{session.mediaType}</Text>
@@ -92,8 +95,8 @@ export function SessionCard({
               </Text>
               {isLarge ? (
                 <View style={styles.highlightRow}>
-                  {highlights.map((highlight) => (
-                    <View key={highlight} style={styles.highlightPill}>
+                  {highlights.map((highlight, index) => (
+                    <View key={`${index}-${highlight}`} style={styles.highlightPill}>
                       <Text numberOfLines={1} style={styles.highlightText}>
                         {highlight}
                       </Text>
@@ -116,26 +119,23 @@ export function SessionCard({
           </LinearGradient>
         </ImageBackground>
       </Pressable>
-      {onToggleSaved ? (
-        <BreathingPressable
-          accessibilityLabel={isSaved ? `Remove ${session.title} from Saved` : `Save ${session.title}`}
-          accessibilityRole="button"
-          accessibilityState={{ selected: isSaved }}
-          hitSlop={theme.spacing.xs}
-          onPress={toggleSaved}
-          containerStyle={styles.saveButtonOverlay}
-          style={[
-            styles.saveButton,
-            isSaved && styles.savedButton,
-          ]}
-        >
-          <Bookmark
-            color={isSaved ? colors.navy : colors.white}
-            fill={isSaved ? colors.white : 'transparent'}
-            size={17}
-          />
-        </BreathingPressable>
-      ) : null}
+      <BreathingPressable
+        accessibilityLabel={isSaved ? `Remove ${session.title} from Saved` : `Save ${session.title}`}
+        accessibilityRole="button"
+        hitSlop={theme.spacing.xs}
+        onPress={toggleSaved}
+        containerStyle={styles.saveButtonOverlay}
+        style={[
+          styles.saveButton,
+          isSaved && styles.savedButton,
+        ]}
+      >
+        <Bookmark
+          color={isSaved ? colors.navy : colors.white}
+          fill={isSaved ? colors.white : 'transparent'}
+          size={17}
+        />
+      </BreathingPressable>
     </Animated.View>
   );
 }
@@ -180,12 +180,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  featuredPill: {
-    backgroundColor: colors.sunshine,
-    borderRadius: theme.radius.full,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xxs,
-  },
   saveButton: {
     alignItems: 'center',
     backgroundColor: colors.transparentNavy,
@@ -209,12 +203,6 @@ const styles = StyleSheet.create({
   savedButton: {
     backgroundColor: colors.hotPink,
     borderColor: colors.hotPink,
-  },
-  featuredText: {
-    color: colors.navy,
-    fontFamily: theme.typography.fontFamily.semibold,
-    fontSize: theme.typography.size.xs,
-    lineHeight: theme.typography.lineHeight.sm,
   },
   mediaPill: {
     alignItems: 'center',

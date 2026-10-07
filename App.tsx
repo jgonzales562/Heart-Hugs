@@ -6,31 +6,32 @@ import { StatusBar } from 'expo-status-bar';
 import { BookHeart, Bookmark, Heart } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { enableScreens } from 'react-native-screens';
+import {
+  initialWindowMetrics,
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import { GradientScreen } from './src/components/GradientScreen';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 import { BreathingPressable } from './src/components/BreathingPressable';
 import { WELLNESS_DISCLAIMER_VERSION } from './src/constants/disclaimer';
 import { DISCLAIMER_ACCEPTANCE_KEY } from './src/constants/storage';
-import { SettingsScreen } from './src/screens/AboutScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { CheckInsScreen } from './src/screens/CheckInsScreen';
-import { TodayScreen } from './src/screens/HomeScreen';
+import { TodayScreen } from './src/screens/TodayScreen';
 import { PlayerScreen } from './src/screens/PlayerScreen';
 import { SavedScreen } from './src/screens/SavedScreen';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
-import { WellnessProvider, useWellness } from './src/state/WellnessProvider';
+import { WellnessProvider } from './src/state/WellnessProvider';
 import { colors, theme } from './src/theme';
-import { MainTabParamList, RootStackParamList } from './src/types/navigation';
+import type { MainTabParamList, RootStackParamList } from './src/types/navigation';
 import {
   createDisclaimerAcceptance,
   hasAcceptedDisclaimerVersion,
   isLegacyDisclaimerAcceptance,
   serializeDisclaimerAcceptance,
 } from './src/utils/disclaimerAcceptance';
-
-enableScreens();
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -48,8 +49,11 @@ const navigationTheme = {
 };
 
 function AppTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
+      initialRouteName="Today"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.sunshine,
@@ -65,7 +69,7 @@ function AppTabs() {
         ),
         tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { bottom: Math.max(insets.bottom, 14) }],
       }}
     >
       <Tab.Screen
@@ -104,7 +108,7 @@ function AppTabs() {
 
 function RootNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName="MainTabs" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={AppTabs} />
       <Stack.Screen name="Player" component={PlayerScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -113,20 +117,22 @@ function RootNavigator() {
 }
 
 function MainExperience() {
-  const { isHydrated } = useWellness();
-
-  if (!isHydrated) {
-    return (
-      <GradientScreen contentContainerStyle={styles.loadingScreen} includeBottomSafeArea>
-        <ActivityIndicator color={colors.leafDeep} />
-      </GradientScreen>
-    );
-  }
-
   return (
     <NavigationContainer theme={navigationTheme}>
       <RootNavigator />
     </NavigationContainer>
+  );
+}
+
+function WellnessLoadingFallback() {
+  return (
+    <GradientScreen contentContainerStyle={styles.loadingScreen} includeBottomSafeArea>
+      <ActivityIndicator
+        accessibilityLabel="Loading Heart Hugs"
+        accessibilityRole="progressbar"
+        color={colors.leafDeep}
+      />
+    </GradientScreen>
   );
 }
 
@@ -201,18 +207,22 @@ export default function App() {
   }
 
   return (
-    <AppErrorBoundary>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <StatusBar style="dark" />
+      <AppErrorBoundary>
         {hasAcceptedDisclaimer === null ? (
           <GradientScreen contentContainerStyle={styles.loadingScreen} includeBottomSafeArea>
             <View style={styles.brandMark}>
               <Heart color={colors.rose} fill={colors.roseSoft} size={28} />
             </View>
-            <ActivityIndicator color={colors.leafDeep} />
+            <ActivityIndicator
+              accessibilityLabel="Loading Heart Hugs"
+              accessibilityRole="progressbar"
+              color={colors.leafDeep}
+            />
           </GradientScreen>
         ) : hasAcceptedDisclaimer ? (
-          <WellnessProvider>
+          <WellnessProvider fallback={<WellnessLoadingFallback />}>
             <MainExperience />
           </WellnessProvider>
         ) : (
@@ -222,8 +232,8 @@ export default function App() {
             onAccept={acceptDisclaimer}
           />
         )}
-      </SafeAreaProvider>
-    </AppErrorBoundary>
+      </AppErrorBoundary>
+    </SafeAreaProvider>
   );
 }
 
@@ -234,7 +244,6 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderTopWidth: 0,
     borderWidth: 1,
-    bottom: 14,
     height: 72,
     left: 22,
     paddingBottom: theme.spacing.sm,

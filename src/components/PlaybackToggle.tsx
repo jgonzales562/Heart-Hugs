@@ -1,17 +1,17 @@
 import { Pause, Play } from 'lucide-react-native';
-import { useEffect, useRef } from 'react';
+import { useRef, type ReactElement } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { BreathingPressable } from './BreathingPressable';
 import { colors, theme } from '../theme';
 
 type PlaybackToggleProps = {
-  accessibilityLabel: string;
-  disabled?: boolean;
-  isPending?: boolean;
-  isPlaying: boolean;
-  onPress: () => Promise<void>;
-  variant?: 'large' | 'compact';
+  readonly accessibilityLabel: string;
+  readonly disabled?: boolean;
+  readonly isPending?: boolean;
+  readonly isPlaying: boolean;
+  readonly onPress: () => Promise<void>;
+  readonly variant?: 'large' | 'compact';
 };
 
 export function PlaybackToggle({
@@ -21,33 +21,27 @@ export function PlaybackToggle({
   isPlaying,
   onPress,
   variant = 'compact',
-}: PlaybackToggleProps) {
+}: PlaybackToggleProps): ReactElement {
   const isLarge = variant === 'large';
+  const isDisabled = disabled || isPending;
   const iconSize = isLarge ? 30 : 20;
-  const pressGuardTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isPressGuardActive = useRef(false);
 
-  useEffect(() => {
-    return () => {
-      if (pressGuardTimeout.current) {
-        clearTimeout(pressGuardTimeout.current);
-      }
-    };
-  }, []);
-
-  function handlePress() {
+  function handlePress(): void {
     if (isPressGuardActive.current) {
       return;
     }
 
     isPressGuardActive.current = true;
-    void onPress().catch((error) => {
-      console.warn('Unable to update playback.', error);
-    });
-
-    pressGuardTimeout.current = setTimeout(() => {
-      isPressGuardActive.current = false;
-    }, 350);
+    void (async () => {
+      try {
+        await onPress();
+      } catch (error) {
+        console.warn('Unable to update playback.', error);
+      } finally {
+        isPressGuardActive.current = false;
+      }
+    })();
   }
 
   return (
@@ -55,14 +49,14 @@ export function PlaybackToggle({
       accessibilityLabel={accessibilityLabel}
       accessibilityHint="Toggles playback for this session."
       accessibilityRole="button"
-      accessibilityState={{ busy: isPending, disabled: disabled || isPending, selected: isPlaying }}
-      disabled={disabled || isPending}
+      accessibilityState={{ busy: isPending, disabled: isDisabled }}
+      disabled={isDisabled}
       hitSlop={isLarge ? 0 : theme.spacing.xs}
       onPress={handlePress}
       style={[
         styles.button,
         isLarge ? styles.largeButton : styles.compactButton,
-        (disabled || isPending) && styles.disabled,
+        isDisabled && styles.disabled,
       ]}
     >
       {isPending ? (
