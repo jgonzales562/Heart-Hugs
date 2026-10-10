@@ -1,6 +1,6 @@
 import { ArrowLeft, Bookmark, Check, Clock3 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { BreathingPressable } from '../components/BreathingPressable';
 import { GradientScreen } from '../components/GradientScreen';
@@ -10,12 +10,59 @@ import { sessionRepository } from '../content/sessionRepository';
 import { getSessionArtwork } from '../data/sessionArtwork';
 import { useWellness } from '../state/WellnessProvider';
 import { colors, theme } from '../theme';
-import { RootStackScreenProps } from '../types/navigation';
-import { Session } from '../types/session';
+import type { RootStackScreenProps } from '../types/navigation';
+import type { Session } from '../types/session';
+import { getRelatedSessions } from '../utils/sessionDiscovery';
 
-export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player'>) {
-  const activeSession = sessionRepository.getById(route.params.sessionId) ?? sessionRepository.getDefault();
-  const sessions = sessionRepository.getAll();
+const ALL_SESSIONS = sessionRepository.getAll();
+const PLAYER_OVERLAY_COLORS = ['transparent', 'transparent'] as const;
+const COMPLETION_TITLE = 'Session complete';
+const COMPLETION_MESSAGE = 'Take a moment to notice how you feel now.';
+const COMPLETION_ANNOUNCEMENT = `${COMPLETION_TITLE}. ${COMPLETION_MESSAGE}`;
+
+type PlayerNavigationProps = {
+  readonly navigation: RootStackScreenProps<'Player'>['navigation'];
+};
+
+type PlayerExperienceProps = PlayerNavigationProps & {
+  readonly activeSession: Session;
+};
+
+type SessionContextProps = {
+  readonly session: Session;
+};
+
+export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player'>): ReactElement {
+  const activeSession = sessionRepository.getById(route.params.sessionId);
+
+  if (!activeSession) {
+    return <UnavailableSession navigation={navigation} />;
+  }
+
+  return (
+    <PlayerExperience activeSession={activeSession} key={activeSession.id} navigation={navigation} />
+  );
+}
+
+function UnavailableSession({ navigation }: PlayerNavigationProps): ReactElement {
+  function returnToToday(): void {
+    navigation.popTo('MainTabs', { screen: 'Today' });
+  }
+
+  return (
+    <GradientScreen contentContainerStyle={styles.unavailableScreen} includeBottomSafeArea scroll>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>Session unavailable</Text>
+      <Text style={[styles.contextText, styles.unavailableMessage]}>
+        This session could not be found. Explore Today to choose another practice.
+      </Text>
+      <BreathingPressable accessibilityRole="button" onPress={returnToToday} style={styles.todayButton}>
+        <Text style={styles.todayButtonText}>Return to Today</Text>
+      </BreathingPressable>
+    </GradientScreen>
+  );
+}
+
+function PlayerExperience({ activeSession, navigation }: PlayerExperienceProps): ReactElement {
   const {
     markSessionCompleted,
     recordOpened,
@@ -23,49 +70,55 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
     state,
     toggleSaved,
   } = useWellness();
-  const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
   const activity = state.activityBySessionId[activeSession.id];
   const [resumePosition] = useState(activity?.positionSeconds ?? 0);
-  const isSaved = state.savedSessionIds.includes(activeSession.id);
-  const isCompleted = completedSessionId === activeSession.id;
-  const relatedSessions = sessions
-    .filter(
-      (session) =>
-        session.id !== activeSession.id &&
-        session.needIds.some((needId) => activeSession.needIds.includes(needId))
-    )
-    .concat(sessions.filter((session) => session.id !== activeSession.id))
-    .filter(
-      (session, index, allSessions) =>
-        allSessions.findIndex((candidate) => candidate.id === session.id) === index
-    )
-    .slice(0, 2);
+  const savedSessionIds = useMemo(() => new Set(state.savedSessionIds), [state.savedSessionIds]);
+  const isSaved = savedSessionIds.has(activeSession.id);
+  const relatedSessions = useMemo(
+    () => getRelatedSessions(ALL_SESSIONS, activeSession),
+    [activeSession]
+  );
 
   useEffect(() => {
     recordOpened(activeSession.id);
   }, [activeSession.id, recordOpened]);
 
-  function handleProgress(currentTime: number, duration: number) {
+  useEffect(() => {
+    if (isCompleted && Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(COMPLETION_ANNOUNCEMENT, { queue: true });
+    }
+  }, [isCompleted]);
+
+  const handleProgress = useCallback((currentTime: number, duration: number): void => {
     saveProgress(activeSession.id, currentTime, duration);
-  }
+  }, [activeSession.id, saveProgress]);
 
-  function handlePause(currentTime: number, duration: number) {
+  const handlePause = useCallback((currentTime: number, duration: number): void => {
     saveProgress(activeSession.id, currentTime, duration, true);
-  }
+  }, [activeSession.id, saveProgress]);
 
-  function handleCompletion() {
+  const handleCompletion = useCallback((): void => {
     markSessionCompleted(activeSession.id);
-    setCompletedSessionId(activeSession.id);
-  }
+    setIsCompleted(true);
+  }, [activeSession.id, markSessionCompleted]);
 
-  function openRelatedSession(session: Session) {
+  const openRelatedSession = useCallback((session: Session): void => {
     navigation.replace('Player', { sessionId: session.id });
-  }
+  }, [navigation]);
+
+  const toggleSessionSaved = useCallback((session: Session): void => {
+    toggleSaved(session.id);
+  }, [toggleSaved]);
+
+  const toggleActiveSessionSaved = useCallback((): void => {
+    toggleSaved(activeSession.id);
+  }, [activeSession.id, toggleSaved]);
 
   return (
     <GradientScreen
       backgroundImageSource={getSessionArtwork(activeSession)}
-      backgroundOverlayColors={['transparent', 'transparent']}
+      backgroundOverlayColors={PLAYER_OVERLAY_COLORS}
       contentContainerStyle={styles.screen}
       includeBottomSafeArea
       scroll
@@ -78,20 +131,29 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
           onPress={navigation.goBack}
           style={styles.navButton}
         >
-          <ArrowLeft color={colors.navy} size={22} />
+          <ArrowLeft
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            color={colors.navy}
+            size={22}
+          />
         </BreathingPressable>
         <BreathingPressable
           accessibilityLabel={isSaved ? `Remove ${activeSession.title} from Saved` : `Save ${activeSession.title}`}
           accessibilityRole="button"
           accessibilityState={{ selected: isSaved }}
           hitSlop={theme.spacing.xs}
-          onPress={() => toggleSaved(activeSession.id)}
+          onPress={toggleActiveSessionSaved}
           style={[
             styles.navButton,
             isSaved && styles.savedButton,
           ]}
         >
           <Bookmark
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
             color={colors.navy}
             fill={isSaved ? colors.white : 'transparent'}
             size={21}
@@ -102,9 +164,15 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
       <View style={styles.sessionIntro}>
         <View style={styles.heroCopy}>
           <Text style={styles.heroEyebrow}>{activeSession.category}</Text>
-          <Text style={styles.title}>{activeSession.title}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{activeSession.title}</Text>
           <View style={styles.heroMetaRow}>
-            <Clock3 color={colors.white} size={15} />
+            <Clock3
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              color={colors.white}
+              size={15}
+            />
             <Text style={styles.heroMeta}>{activeSession.durationMinutes} min</Text>
           </View>
         </View>
@@ -113,29 +181,40 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
       <View style={styles.activeSession}>
         <View>
           <Text style={[styles.sectionEyebrow, styles.artworkEyebrow]}>NOW PLAYING</Text>
-          <Text style={[styles.sectionTitle, styles.artworkTitle]}>Your session</Text>
+          <Text accessibilityRole="header" style={[styles.sectionTitle, styles.artworkTitle]}>Your session</Text>
         </View>
         <MediaPlayer
           initialPosition={resumePosition}
-          key={activeSession.id}
           onComplete={handleCompletion}
           onPause={handlePause}
           onProgress={handleProgress}
           session={activeSession}
         />
-        {resumePosition > 1 ? (
-          <Text accessibilityLiveRegion="polite" style={[styles.resumeNote, styles.artworkSupportingText]}>
-            Resumed from your last listening position.
+        {resumePosition > 1 && !isCompleted ? (
+          <Text style={[styles.resumeNote, styles.artworkSupportingText]}>
+            Continue from your last listening position.
           </Text>
         ) : null}
         {isCompleted ? (
-          <View accessibilityLiveRegion="polite" style={styles.completionPanel}>
+          <View
+            accessible
+            accessibilityLabel={COMPLETION_ANNOUNCEMENT}
+            accessibilityLiveRegion="polite"
+            role="status"
+            style={styles.completionPanel}
+          >
             <View style={styles.completionIcon}>
-              <Check color={colors.navy} size={19} />
+              <Check
+                accessible={false}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                color={colors.navy}
+                size={19}
+              />
             </View>
             <View style={styles.completionCopy}>
-              <Text style={styles.completionTitle}>Session complete</Text>
-              <Text style={styles.completionText}>Take a moment to notice how you feel now.</Text>
+              <Text style={styles.completionTitle}>{COMPLETION_TITLE}</Text>
+              <Text style={styles.completionText}>{COMPLETION_MESSAGE}</Text>
             </View>
           </View>
         ) : null}
@@ -144,21 +223,21 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
 
       {activeSession.transcript ? (
         <View style={styles.transcriptPanel}>
-          <Text style={styles.sectionEyebrow}>TRANSCRIPT</Text>
+          <Text accessibilityRole="header" style={styles.sectionEyebrow}>TRANSCRIPT</Text>
           <Text style={styles.contextText}>{activeSession.transcript}</Text>
         </View>
       ) : null}
 
       <View style={styles.section}>
         <Text style={[styles.sectionEyebrow, styles.artworkEyebrow]}>KEEP EXPLORING</Text>
-        <Text style={[styles.sectionTitle, styles.artworkTitle]}>More for this moment</Text>
+        <Text accessibilityRole="header" style={[styles.sectionTitle, styles.artworkTitle]}>More for this moment</Text>
         <View style={styles.sessionList}>
           {relatedSessions.map((session) => (
             <SessionCard
-              isSaved={state.savedSessionIds.includes(session.id)}
+              isSaved={savedSessionIds.has(session.id)}
               key={session.id}
               onPress={openRelatedSession}
-              onToggleSaved={(selectedSession) => toggleSaved(selectedSession.id)}
+              onToggleSaved={toggleSessionSaved}
               session={session}
             />
           ))}
@@ -168,17 +247,24 @@ export function PlayerScreen({ navigation, route }: RootStackScreenProps<'Player
   );
 }
 
-function SessionContext({ session }: { session: Session }) {
+function SessionContext({ session }: SessionContextProps): ReactElement {
   return (
     <View style={styles.sessionContext}>
       <View style={styles.contextMetaRow}>
         <Text style={styles.contextMeta}>{session.mediaType === 'audio' ? 'Audio' : 'Video'}</Text>
-        <Text style={styles.contextDivider}>/</Text>
+        <Text
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          style={styles.contextDivider}
+        >
+          /
+        </Text>
         <Text style={styles.contextMeta}>By {session.authorName}</Text>
       </View>
 
       <View style={styles.contextBlock}>
-        <Text style={styles.contextLabel}>May help you</Text>
+        <Text accessibilityRole="header" style={styles.contextLabel}>May help you</Text>
         <Text style={styles.contextText}>{session.benefits.join(', ')}</Text>
       </View>
 
@@ -194,6 +280,30 @@ function SessionContext({ session }: { session: Session }) {
 }
 
 const styles = StyleSheet.create({
+  unavailableScreen: {
+    alignItems: 'center',
+    flexGrow: 1,
+    gap: theme.spacing.lg,
+    justifyContent: 'center',
+    paddingBottom: theme.spacing.xl,
+  },
+  unavailableMessage: {
+    textAlign: 'center',
+  },
+  todayButton: {
+    backgroundColor: colors.sunshine,
+    borderRadius: theme.radius.full,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+  },
+  todayButtonText: {
+    color: colors.navy,
+    fontFamily: theme.typography.fontFamily.semibold,
+    fontSize: theme.typography.size.sm,
+    textAlign: 'center',
+  },
   screen: {
     paddingBottom: theme.spacing.xl,
     paddingTop: theme.spacing.sm,

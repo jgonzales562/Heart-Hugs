@@ -69,7 +69,6 @@ export const wellnessNeeds: readonly WellnessNeed[] = [
 export type SessionRepository = {
   getAll(): readonly Session[];
   getById(sessionId: string): Session | undefined;
-  getDefault(): Session;
 };
 
 export function validateSessionCatalog(catalog: unknown): readonly string[] {
@@ -218,14 +217,7 @@ if (validationIssues.length > 0) {
 }
 
 const sessionsById = new Map(sessionCatalog.map((session) => [session.id, session]));
-const defaultSession = sessionCatalog.find((session) => session.isFeatured);
-
-if (!defaultSession) {
-  throw new Error('Heart Hugs requires one featured catalog session.');
-}
-
 export const sessionRepository: SessionRepository = {
   getAll: () => sessionCatalog,
   getById: (sessionId) => sessionsById.get(sessionId),
-  getDefault: () => defaultSession,
 };

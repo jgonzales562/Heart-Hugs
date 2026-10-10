@@ -13,6 +13,10 @@ describe('session repository', () => {
     expect(sessionRepository.getById(firstSession.id)).toBe(firstSession);
   });
 
+  it('returns no session for an unknown id', () => {
+    expect(sessionRepository.getById('missing-session')).toBeUndefined();
+  });
+
   it('exposes the requested practice filters', () => {
     expect(wellnessNeeds.map((need) => need.label)).toEqual([
       'Grounding',
@@ -79,7 +83,7 @@ describe('session repository', () => {
   });
 
   it('rejects duplicate ids and multiple featured sessions', () => {
-    const session = sessionRepository.getDefault();
+    const session = { ...sessionRepository.getAll()[0], isFeatured: true };
     const issues = validateSessionCatalog([session, { ...session }]);
 
     expect(issues).toEqual(
